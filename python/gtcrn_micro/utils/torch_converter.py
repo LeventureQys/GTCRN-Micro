@@ -1,6 +1,10 @@
 import torch
+import torch.nn as nn
 import ai_edge_torch
 import soundfile as sf
+
+# test
+from torch import export
 
 # from models.gtcrn.gtcrn import GTCRN
 from gtcrn_micro.models.gtcrn_micro import GTCRNMicro
@@ -29,6 +33,23 @@ from gtcrn_micro.models.gtcrn_micro import GTCRNMicro
 
 
 model = GTCRNMicro().eval()
+
+print("=== ConvTranspose2d layers ===")
+for name, m in model.named_modules():
+    if isinstance(m, nn.ConvTranspose2d):
+        print(
+            name,
+            "in:",
+            m.in_channels,
+            "out:",
+            m.out_channels,
+            "kernel:",
+            m.kernel_size,
+            "stride:",
+            m.stride,
+            "groups:",
+            m.groups,
+        )
 # missing, unexpected = model.load_state_dict(state, strict=False)
 # print("Missing:", missing[:10], " ... total:", len(missing))
 # print("Unexpected:", unexpected[:10], " ... total:", len(unexpected), "\n")
@@ -37,7 +58,7 @@ model = GTCRNMicro().eval()
 # testing that forward pass works!
 # loading test
 mix, fs = sf.read(
-    "./gtcrn_micro/data/DNS3/V2_V3_DNSChallenge_Blindset/noisy_blind_testset_v3_challenge_withSNR_16k/nonenglish_synthetic_male_SNR_21.0dB_german_1.wav",
+    "./gtcrn_micro/data/DNS3/V2_V3_DNSChallenge_Blindset/noisy_blind_testset_v3_challenge_withSNR_16k/ms_realrec_emotional_female_SNR_17.74dB_headset_A2AHXGFXPG6ZSR_Water_far_Laughter_12.wav",
     dtype="float32",
 )
 print("\n", mix)
@@ -58,19 +79,26 @@ with torch.no_grad():
     y = model(input[None])[0]
 print("Forward works!", tuple(y.shape) if hasattr(y, "shape") else type(y), "\n")
 
-# recovering audio test
+# # recovering audio test
+# y = torch.view_as_complex(y.contiguous())
 # enhanced_audio = torch.istft(
 #     y,
 #     512,
 #     256,
 #     512,
 #     torch.hann_window(512).pow(0.5),
-#     return_complex=False,
 # )
 # sf.write("enhanced.wav", enhanced_audio.detach().cpu().numpy(), fs)
 
+# making a smaller input for conversion
+input_small = input[:, :64, :]
+
+# test export from torch
+exported = export.export(model, (input_small[None],))
+print("torch export works...")
+
 # conversion test
-edge_model = ai_edge_torch.convert(model, (input[None],))
+edge_model = ai_edge_torch.convert(model, (input_small[None],))
 print("Conversion works!")
 
 # test TFLite Micro model

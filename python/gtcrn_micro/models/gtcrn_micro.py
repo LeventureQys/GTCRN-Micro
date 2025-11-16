@@ -70,25 +70,24 @@ class ERB(nn.Module):
         return torch.cat([x_erb_low, x_erb_high], dim=-1)
 
 
-# class SFE(nn.Module):
-#     """Subband Feature Extraction"""
-#
-#     def __init__(self, kernel_size=3, stride=1):
-#         super().__init__()
-#         self.kernel_size = kernel_size
-#         self.unfold = nn.Unfold(
-#             kernel_size=(1, kernel_size),
-#             stride=(1, stride),
-#             padding=(0, (kernel_size - 1) // 2),
-#         )
-#
-#     def forward(self, x):
-#         """x: (B,C,T,F)"""
-#         xs = self.unfold(x).reshape(
-#             x.shape[0], x.shape[1] * self.kernel_size, x.shape[2], x.shape[3]
-#         )
-#         return xs
-#
+class SFE(nn.Module):
+    """Subband Feature Extraction"""
+
+    def __init__(self, kernel_size=3, stride=1):
+        super().__init__()
+        self.kernel_size = kernel_size
+        self.unfold = nn.Unfold(
+            kernel_size=(1, kernel_size),
+            stride=(1, stride),
+            padding=(0, (kernel_size - 1) // 2),
+        )
+
+    def forward(self, x):
+        """x: (B,C,T,F)"""
+        xs = self.unfold(x).reshape(
+            x.shape[0], x.shape[1] * self.kernel_size, x.shape[2], x.shape[3]
+        )
+        return xs
 
 
 class TRA(nn.Module):
@@ -96,14 +95,14 @@ class TRA(nn.Module):
 
     def __init__(self, channels):
         super().__init__()
-        self.att_gru = nn.LSTM(channels, channels * 2, 1, batch_first=True)
+        self.att_lstm = nn.LSTM(channels, channels * 2, 1, batch_first=True)
         self.att_fc = nn.Linear(channels * 2, channels)
         self.att_act = nn.Sigmoid()
 
     def forward(self, x):
         """x: (B,C,T,F)"""
         zt = torch.mean(x.pow(2), dim=-1)  # (B,C,T)
-        at = self.att_gru(zt.transpose(1, 2))[0]
+        at = self.att_lstm(zt.transpose(1, 2))[0]
         at = self.att_fc(at).transpose(1, 2)
         at = self.att_act(at)
         At = at[..., None]  # (B,C,T,1)
@@ -129,6 +128,7 @@ class ConvBlock(nn.Module):
             in_channels, out_channels, kernel_size, stride, padding, groups=groups
         )
         self.bn = nn.BatchNorm2d(out_channels)
+        # trying to fix conversion issue
         self.act = nn.Tanh() if is_last else nn.PReLU()
 
     def forward(self, x):
@@ -155,19 +155,48 @@ class GTConvBlock(nn.Module):
 
         # self.sfe = SFE(kernel_size=3, stride=1)
 
-        self.point_conv1 = conv_module(in_channels // 2 * 3, hidden_channels, 1)
+        # if removing SFE, remove * 3 because we don't have a kernel of size 3
+        self.point_conv1 = conv_module(in_channels // 2, hidden_channels, 1)  # no SFE
+        # self.point_conv1 = conv_module(in_channels // 2 * 3, hidden_channels, 1)
         self.point_bn1 = nn.BatchNorm2d(hidden_channels)
         self.point_act = nn.PReLU()
 
-        self.depth_conv = conv_module(
-            hidden_channels,
-            hidden_channels,
-            kernel_size,
-            stride=stride,
-            padding=padding,
-            dilation=dilation,
-            groups=hidden_channels,
-        )
+        if use_deconv:
+            self.depth_conv = conv_module(
+                hidden_channels,
+                hidden_channels,
+                kernel_size,
+                stride=stride,
+                padding=padding,
+                dilation=dilation,
+                # groups=hidden_channels,
+                groups=1,  # fixing for conversion
+            )
+        else:
+            self.depth_conv = conv_module(
+                hidden_channels,
+                hidden_channels,
+                kernel_size,
+                stride=stride,
+                padding=padding,
+                dilation=dilation,
+                # groups=hidden_channels,
+                groups=16,  # fixing for conversion
+            )
+
+        # NOTE: NEED TO FIX THIS!
+        # explicit Conv2d for conversion
+        # self.depth_conv = nn.Conv2d(
+        #     hidden_channels,
+        #     hidden_channels,
+        #     kernel_size,
+        #     stride=stride,
+        #     padding=padding,
+        #     dilation=dilation,
+        #     # groups=hidden_channels,
+        #     groups=1,  # fixing for conversion
+        # )
+
         self.depth_bn = nn.BatchNorm2d(hidden_channels)
         self.depth_act = nn.PReLU()
 
@@ -201,7 +230,7 @@ class GTConvBlock(nn.Module):
 
 
 class GRNN(nn.Module):
-    """Grouped RNN"""
+    """Grouped LSTM?"""
 
     def __init__(
         self,
@@ -215,14 +244,14 @@ class GRNN(nn.Module):
         self.hidden_size = hidden_size
         self.num_layers = num_layers
         self.bidirectional = bidirectional
-        self.rnn1 = nn.LSTM(
+        self.lstm1 = nn.LSTM(
             input_size // 2,
             hidden_size // 2,
             num_layers,
             batch_first=batch_first,
             bidirectional=bidirectional,
         )
-        self.rnn2 = nn.LSTM(
+        self.lstm2 = nn.LSTM(
             input_size // 2,
             hidden_size // 2,
             num_layers,
@@ -230,11 +259,12 @@ class GRNN(nn.Module):
             bidirectional=bidirectional,
         )
 
-    def forward(self, x, h=None):
+    def forward(self, x, h=None, c=None):
         """
         x: (B, seq_length, input_size)
         h: (num_layers, B, hidden_size)
         """
+        # debug
         if h is None:
             if self.bidirectional:
                 h = torch.zeros(
@@ -244,14 +274,30 @@ class GRNN(nn.Module):
                 h = torch.zeros(
                     self.num_layers, x.shape[0], self.hidden_size, device=x.device
                 )
+
+        # adding C for LSTM
+        if c is None:
+            if self.bidirectional:
+                c = torch.zeros(
+                    self.num_layers * 2, x.shape[0], self.hidden_size, device=x.device
+                )
+            else:
+                c = torch.zeros(
+                    self.num_layers, x.shape[0], self.hidden_size, device=x.device
+                )
+
         x1, x2 = torch.chunk(x, chunks=2, dim=-1)
         h1, h2 = torch.chunk(h, chunks=2, dim=-1)
         h1, h2 = h1.contiguous(), h2.contiguous()
-        y1, h1 = self.rnn1(x1, h1)
-        y2, h2 = self.rnn2(x2, h2)
+        c1, c2 = torch.chunk(c, chunks=2, dim=-1)
+        c1, c2 = c1.contiguous(), c2.contiguous()
+        # adjusting outputs and inputs for LSTM
+        y1, (h1, c1) = self.lstm1(x1, (h1, c1))
+        y2, (h2, c2) = self.lstm2(x2, (h2, c2))
         y = torch.cat([y1, y2], dim=-1)
         h = torch.cat([h1, h2], dim=-1)
-        return y, h
+        c = torch.cat([c1, c2], dim=-1)
+        return y, h, c
 
 
 class DPGRNN(nn.Module):
@@ -313,7 +359,8 @@ class Encoder(nn.Module):
         self.en_convs = nn.ModuleList(
             [
                 ConvBlock(
-                    3 * 3,
+                    3,  # no SFE
+                    # 3 * 3,  # SFE
                     16,
                     (1, 5),
                     stride=(1, 2),
@@ -327,7 +374,8 @@ class Encoder(nn.Module):
                     (1, 5),
                     stride=(1, 2),
                     padding=(0, 2),
-                    groups=2,
+                    groups=1,  # switched for conversion
+                    # groups=2,
                     use_deconv=False,
                     is_last=False,
                 ),
@@ -407,7 +455,8 @@ class Decoder(nn.Module):
                     (1, 5),
                     stride=(1, 2),
                     padding=(0, 2),
-                    groups=2,
+                    groups=1,  # for TFLM conversion
+                    # groups=2,
                     use_deconv=True,
                     is_last=False,
                 ),
@@ -426,6 +475,7 @@ class Decoder(nn.Module):
     def forward(self, x, en_outs):
         N_layers = len(self.de_convs)
         for i in range(N_layers):
+            print(x.shape)
             x = self.de_convs[i](x + en_outs[N_layers - 1 - i])
         return x
 
@@ -469,71 +519,86 @@ class GTCRNMicro(nn.Module):
         spec_mag = torch.sqrt(spec_real**2 + spec_imag**2 + 1e-12)
         feat = torch.stack([spec_mag, spec_real, spec_imag], dim=1)  # (B,3,T,257)
 
+        # print("\n----------\nDebug:\n********** \nSpec works\n**********")
+
         feat = self.erb.bm(feat)  # (B,3,T,129)
         # feat = self.sfe(feat)  # (B,9,T,129)
+        # print("********** \nERB works\n**********")
 
         feat, en_outs = self.encoder(feat)
+        print(f"feat enc size: {feat.shape}")
+        # print("********** \nEncoder works\n**********")
 
         feat = self.dpgrnn1(feat)  # (B,16,T,33)
+        print(f"feat dp1 size: {feat.shape}")
         feat = self.dpgrnn2(feat)  # (B,16,T,33)
+        print(f"feat dp2 size: {feat.shape}")
+        # print("********** \nDPLSTM works\n**********")
 
         m_feat = self.decoder(feat, en_outs)
+        print(f"feat decoder size: {feat.shape}")
+        # print("********** \nDecoder works\n**********")
 
         m = self.erb.bs(m_feat)
 
         spec_enh = self.mask(m, spec_ref.permute(0, 3, 2, 1))  # (B,2,T,F)
         spec_enh = spec_enh.permute(0, 3, 2, 1)  # (B,F,T,2)
+        # print("********** \nSpeech Enhancement works\n**********")
 
         return spec_enh
 
 
 if __name__ == "__main__":
     # checking ops
-    model = GTCRNMicro()
-    # key: op, val: name
-    ops = set()
-    print("Modules in GTCRN: \n")
-    for name, module in model.named_modules():
-        ops.add(module)
-        # ops[module] = name
-        # print(f"Name: {name}\nModule Type: {module}\n---------")
-    with open("./model_ops_basic.md", "w") as writefile:
-        for i in ops:
-            # print(f"Module: {i}\n---------------")
-            writefile.write(str(i))
-            writefile.writelines("\n--------\n")
+    # model = GTCRNMicro()
+    # # key: op, val: name
+    # ops = set()
+    # print("Modules in GTCRN: \n")
+    # for name, module in model.named_modules():
+    #     ops.add(module)
+    #     # ops[module] = name
+    #     # print(f"Name: {name}\nModule Type: {module}\n---------")
+    # with open("./model_ops_basic.md", "w") as writefile:
+    #     for i in ops:
+    #         # print(f"Module: {i}\n---------------")
+    #         writefile.write(str(i))
+    #         writefile.writelines("\n--------\n")
 
-    # model = GTCRN().eval()
-    #
-    # """complexity count"""
-    # from ptflops import get_model_complexity_info
-    #
-    # flops, params = get_model_complexity_info(
-    #     model, (257, 63, 2), as_strings=True, print_per_layer_stat=True, verbose=True
-    # )
-    # print(flops, params)
-    #
-    # """causality check"""
-    # a = torch.randn(1, 16000)
-    # b = torch.randn(1, 16000)
-    # c = torch.randn(1, 16000)
-    # x1 = torch.cat([a, b], dim=1)
-    # x2 = torch.cat([a, c], dim=1)
-    #
-    # x1 = torch.stft(
-    #     x1, 512, 256, 512, torch.hann_window(512).pow(0.5), return_complex=False
-    # )
-    # x2 = torch.stft(
-    #     x2, 512, 256, 512, torch.hann_window(512).pow(0.5), return_complex=False
-    # )
-    # y1 = model(x1)[0]
-    # y2 = model(x2)[0]
-    # y1 = torch.istft(
-    #     y1, 512, 256, 512, torch.hann_window(512).pow(0.5), return_complex=False
-    # )
-    # y2 = torch.istft(
-    #     y2, 512, 256, 512, torch.hann_window(512).pow(0.5), return_complex=False
-    # )
-    #
-    # print((y1[: 16000 - 256 * 2] - y2[: 16000 - 256 * 2]).abs().max())
-    # print((y1[16000:] - y2[16000:]).abs().max())
+    model = GTCRNMicro().eval()
+
+    """complexity count"""
+    from ptflops import get_model_complexity_info
+
+    flops, params = get_model_complexity_info(
+        model, (257, 63, 2), as_strings=True, print_per_layer_stat=True, verbose=True
+    )
+    print(flops, params)
+
+    """causality check"""
+    a = torch.randn(1, 16000)
+    b = torch.randn(1, 16000)
+    c = torch.randn(1, 16000)
+    x1 = torch.cat([a, b], dim=1)
+    x2 = torch.cat([a, c], dim=1)
+
+    x1 = torch.stft(
+        x1, 512, 256, 512, torch.hann_window(512).pow(0.5), return_complex=False
+    )
+    x2 = torch.stft(
+        x2, 512, 256, 512, torch.hann_window(512).pow(0.5), return_complex=False
+    )
+    y1 = model(x1)[0]
+    y2 = model(x2)[0]
+
+    # apparently newer torch wants complex
+    y1 = torch.view_as_complex(y1.contiguous())
+    y2 = torch.view_as_complex(y2.contiguous())
+
+    y1 = torch.istft(y1, 512, 256, 512, torch.hann_window(512).pow(0.5))
+    y2 = torch.istft(y2, 512, 256, 512, torch.hann_window(512).pow(0.5))
+
+    # y1 = y1.squeeze(0)
+    # y2 = y2.squeeze(0)
+
+    print((y1[: 16000 - 256 * 2] - y2[: 16000 - 256 * 2]).abs().max())
+    print((y1[16000:] - y2[16000:]).abs().max())
