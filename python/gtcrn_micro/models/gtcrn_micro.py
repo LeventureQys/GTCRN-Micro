@@ -403,7 +403,8 @@ class Encoder(nn.Module):
                     (3, 3),
                     stride=(1, 1),
                     padding=(0, 1),
-                    dilation=(5, 1),
+                    dilation=(2, 1),
+                    # dilation=(5, 1), # switched for LiteRT inference
                     use_deconv=False,
                 ),
             ]
@@ -427,8 +428,10 @@ class Decoder(nn.Module):
                     16,
                     (3, 3),
                     stride=(1, 1),
-                    padding=(2 * 5, 1),
-                    dilation=(5, 1),
+                    padding=(2 * 2, 1),
+                    dilation=(2, 1),
+                    # padding=(2 * 5, 1), # switched for LiteRT inference
+                    # dilation=(5, 1),
                     use_deconv=True,
                 ),
                 GTConvBlock(

@@ -35,26 +35,6 @@ from gtcrn_micro.models.gtcrn_micro import GTCRNMicro
 
 model = GTCRNMicro().eval()
 
-# print("=== ConvTranspose2d layers ===")
-# for name, m in model.named_modules():
-#     if isinstance(m, nn.ConvTranspose2d):
-#         print(
-#             name,
-#             "in:",
-#             m.in_channels,
-#             "out:",
-#             m.out_channels,
-#             "kernel:",
-#             m.kernel_size,
-#             "stride:",
-#             m.stride,
-#             "groups:",
-#             m.groups,
-#         )
-# missing, unexpected = model.load_state_dict(state, strict=False)
-# print("Missing:", missing[:10], " ... total:", len(missing))
-# print("Unexpected:", unexpected[:10], " ... total:", len(unexpected), "\n")
-# model.eval()
 
 # testing that forward pass works!
 # loading test
@@ -97,23 +77,6 @@ input_small = input[:, :64, :]
 # test export from torch
 exported = export.export(model, (input_small[None],))
 print("torch export works...")
-
-# conversion test
-# edge_model = ai_edge_torch.convert(model, (input_small[None],))
-# print("Conversion works!")
-
-# test TFLite Micro model
-# edge_out = edge_model(
-#     input[None],
-# )
-# if hasattr(edge_out, "shape"):
-#     print(f"TFLM forward good! \n{edge_out.shape}")
-# else:
-#     print(type(edge_out))
-#
-# # export flatbuffer
-# edge_model.export("gtcrn.tflite")
-# print("Export of flatbuffer worked!")
 
 
 # -----------------------
