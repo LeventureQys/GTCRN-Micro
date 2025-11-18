@@ -1,6 +1,11 @@
 import torch
-import ai_edge_torch
+
+# import ai_edge_torch
 import soundfile as sf
+import onnx
+
+# test
+from torch import export
 
 # from models.gtcrn.gtcrn import GTCRN
 from gtcrn_micro.models.gtcrn_micro import GTCRNMicro
@@ -29,15 +34,12 @@ from gtcrn_micro.models.gtcrn_micro import GTCRNMicro
 
 
 model = GTCRNMicro().eval()
-# missing, unexpected = model.load_state_dict(state, strict=False)
-# print("Missing:", missing[:10], " ... total:", len(missing))
-# print("Unexpected:", unexpected[:10], " ... total:", len(unexpected), "\n")
-# model.eval()
+
 
 # testing that forward pass works!
 # loading test
 mix, fs = sf.read(
-    "./gtcrn_micro/data/DNS3/V2_V3_DNSChallenge_Blindset/noisy_blind_testset_v3_challenge_withSNR_16k/nonenglish_synthetic_male_SNR_21.0dB_german_1.wav",
+    "./gtcrn_micro/data/DNS3/V2_V3_DNSChallenge_Blindset/noisy_blind_testset_v3_challenge_withSNR_16k/ms_realrec_emotional_female_SNR_17.74dB_headset_A2AHXGFXPG6ZSR_Water_far_Laughter_12.wav",
     dtype="float32",
 )
 print("\n", mix)
@@ -58,30 +60,45 @@ with torch.no_grad():
     y = model(input[None])[0]
 print("Forward works!", tuple(y.shape) if hasattr(y, "shape") else type(y), "\n")
 
-# recovering audio test
+# # recovering audio test
+# y = torch.view_as_complex(y.contiguous())
 # enhanced_audio = torch.istft(
 #     y,
 #     512,
 #     256,
 #     512,
 #     torch.hann_window(512).pow(0.5),
-#     return_complex=False,
 # )
 # sf.write("enhanced.wav", enhanced_audio.detach().cpu().numpy(), fs)
 
-# conversion test
-edge_model = ai_edge_torch.convert(model, (input[None],))
-print("Conversion works!")
+# making a smaller input for conversion
+input_small = input[:, :64, :]
 
-# test TFLite Micro model
-edge_out = edge_model(
-    input[None],
+# test export from torch
+exported = export.export(model, (input_small[None],))
+print("torch export works...")
+
+
+# -----------------------
+# Testing out Torch -> ONNX -> TF -> TFLM
+# onnx_program = torch.onnx.export(model, (input[None]), dynamo=True, report=True)
+# onnx_program.save("gtcrn_micro.onnx")
+
+# older approach - Works!
+torch.onnx.export(
+    model,
+    (input[None]),
+    "gtcrn_micro.onnx",
+    opset_version=17,
+    dynamo=False,
+    input_names=["audio"],
+    output_names=["mask"],
+    export_params=True,
+    do_constant_folding=True,
+    report=True,
 )
-if hasattr(edge_out, "shape"):
-    print(f"TFLM forward good! \n{edge_out.shape}")
-else:
-    print(type(edge_out))
 
-# export flatbuffer
-edge_model.export("gtcrn.tflite")
-print("Export of flatbuffer worked!")
+
+# checking the model
+onnx_model = onnx.load("gtcrn_micro.onnx")
+onnx.checker.check_model(onnx_model)

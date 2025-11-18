@@ -190,6 +190,7 @@ cython_debug/
 
 # Ruff stuff:
 .ruff_cache/
+.ruff_cache
 
 # PyPI configuration file
 .pypirc
@@ -206,7 +207,9 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 
+# ruff?
+
 # dataset
-python/data/
-python/gtcrn_micro/data/
-python/gtcrn_micro/models/gtcrn/
+/data/
+/gtcrn_micro/data/
+/gtcrn_micro/models/gtcrn/
