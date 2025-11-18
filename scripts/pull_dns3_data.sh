@@ -21,7 +21,7 @@ wget "$URL" -O "$TMPZIP"
 
 # unzip the data and send to directory
 # check if DIRECTORY exists, run from root
-DIRECTORY="./python/data/DNS3"
+DIRECTORY="./gtcrn_micro/data/DNS3"
 
 if [[ -d "$DIRECTORY" ]]; then
 	echo "DNS3 directory exists: '$DIRECTORY'"

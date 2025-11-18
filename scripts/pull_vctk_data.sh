@@ -21,7 +21,7 @@ wget "$URL" -O "$TMPZIP"
 
 # unzip the data and send to directory
 # check if DIRECTORY exists, run from root
-DIRECTORY="./python/data/VCTK-DEMAND"
+DIRECTORY="./gtcrn_micro/data/VCTK-DEMAND"
 
 if [[ -d "$DIRECTORY" ]]; then
 	echo "VCTK-DEMAND directory exists: '$DIRECTORY'"

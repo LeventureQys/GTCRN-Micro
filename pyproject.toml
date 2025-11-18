@@ -16,6 +16,7 @@ dependencies = [
     "pesq>=0.0.4",
     "ptflops>=0.7.5",
     "pystoi>=0.4.1",
+    "pytest>=8.4.2",
     "ruff>=0.14.0",
     "safety>=3.6.2",
     "soundfile>=0.13.1",
