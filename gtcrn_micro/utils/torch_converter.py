@@ -88,8 +88,8 @@ print("torch export works...")
 torch.onnx.export(
     model,
     (input[None]),
-    "gtcrn_micro.onnx",
-    opset_version=17,
+    "gtcrn_micro2.onnx",
+    opset_version=16,  # Lowerin opset for LN
     dynamo=False,
     input_names=["audio"],
     output_names=["mask"],
@@ -100,5 +100,5 @@ torch.onnx.export(
 
 
 # checking the model
-onnx_model = onnx.load("gtcrn_micro.onnx")
+onnx_model = onnx.load("gtcrn_micro2.onnx")
 onnx.checker.check_model(onnx_model)
