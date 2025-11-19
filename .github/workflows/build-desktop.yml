@@ -35,11 +35,9 @@ jobs:
         # run: ruff check --fix
         # run: ruff format
 
-      # - name: Run tests
-        # run: uv run pytest tests
-
-      # - name: Run safety
-        # run: bash scripts/safety.sh
+      # Run Tests and safety checks
+      - name: Run tests
+        run: bash scripts/safety.sh
 
 
       - name: Minimize uv cache
