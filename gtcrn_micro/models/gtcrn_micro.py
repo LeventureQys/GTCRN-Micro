@@ -184,19 +184,6 @@ class GTConvBlock(nn.Module):
                 groups=16,  # fixing for conversion
             )
 
-        # NOTE: NEED TO FIX THIS!
-        # explicit Conv2d for conversion
-        # self.depth_conv = nn.Conv2d(
-        #     hidden_channels,
-        #     hidden_channels,
-        #     kernel_size,
-        #     stride=stride,
-        #     padding=padding,
-        #     dilation=dilation,
-        #     # groups=hidden_channels,
-        #     groups=1,  # fixing for conversion
-        # )
-
         self.depth_bn = nn.BatchNorm2d(hidden_channels)
         self.depth_act = nn.PReLU()
 
@@ -394,7 +381,8 @@ class Encoder(nn.Module):
                     (3, 3),
                     stride=(1, 1),
                     padding=(0, 1),
-                    dilation=(2, 1),
+                    dilation=(1, 1),
+                    # dilation=(2, 1), # switched for LiteRT inference
                     use_deconv=False,
                 ),
                 GTConvBlock(
@@ -403,7 +391,7 @@ class Encoder(nn.Module):
                     (3, 3),
                     stride=(1, 1),
                     padding=(0, 1),
-                    dilation=(2, 1),
+                    dilation=(1, 1),
                     # dilation=(5, 1), # switched for LiteRT inference
                     use_deconv=False,
                 ),
@@ -428,8 +416,8 @@ class Decoder(nn.Module):
                     16,
                     (3, 3),
                     stride=(1, 1),
-                    padding=(2 * 2, 1),
-                    dilation=(2, 1),
+                    padding=(2 * 1, 1),
+                    dilation=(1, 1),
                     # padding=(2 * 5, 1), # switched for LiteRT inference
                     # dilation=(5, 1),
                     use_deconv=True,
@@ -439,8 +427,10 @@ class Decoder(nn.Module):
                     16,
                     (3, 3),
                     stride=(1, 1),
-                    padding=(2 * 2, 1),
-                    dilation=(2, 1),
+                    padding=(2 * 1, 1),
+                    dilation=(1, 1),
+                    # padding=(2 * 2, 1), # switched for LiteRT inference
+                    # dilation=(2, 1),
                     use_deconv=True,
                 ),
                 GTConvBlock(
