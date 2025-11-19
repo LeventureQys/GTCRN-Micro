@@ -24,29 +24,28 @@
  - [x] Search for models to work off of (GTCRN)
  - [x] setup datasets for offline evaluation
  - [x] Test PyTorch Converters
- - [ ] Setup datasets for finetuning
- - [ ] Setup basic .sh scripts/makefile
- - [ ] Scope out datasheets for $I^{2}S$ Protocol 
+ - [ ] Setup datasets for training
+ - [x] Setup basic .sh scripts/makefile
+ - [x] Scope out datasheets for $I^{2}S$ Protocol 
 
 - - - 
 
 ### Model Design
 
- - [ ] Setup offline evaluation metrics in [/python](/python/)
+ - [x] Setup offline evaluation metrics in [/python](/python/)
  <!-- - [ ] load .onnx files -->
- - [ ] Reimplement model replacing GRUs and PreRelu for TFLM
- - [ ] Test out fine-tuning freezing non GRU layers to only update GRU replacements
+ - [x] Reimplement model replacing GRUs and for TFLM
  <!-- - [ ] Run metrics to profile on desktop against onnxruntime inference  -->
- - [ ] Setup Inference for validation and benchmarking adjusted model offline pre-convert
- - [ ] Potential revisit to add QAT
- - [ ] Consider adding dry/wet knob like seen in DEMUCS
- - [ ] *Extra*: Create tests at this point for any ```.py``` files aside from Model Design 
+ - [x] Make model adjustments to comply with **Torch $\rightarrow$ ONNX $\rightarrow$ TFLite $\rightarrow$ TFLM**
+ - [ ] Fix parameter replacement for JSON
+ - [ ] Train new model
+ - [ ] *Potential revisit to add QAT*
 
 - - - 
 
 ### Export and Quantization
 
- - [ ] Convert PyTorch Adjusted model with TFLite Micro using PTQ 
+ - [x] Convert PyTorch Adjusted model with TFLite Micro using PTQ 
  - [ ] Profile and measure accuracy of quanitzed model
  - [ ] Potentially revisit [model design](#model-design) to implement QAT if bad performance 
  - [ ] Report measure of # of params and MMACs, ensure can fit on-device or adjust
@@ -58,9 +57,8 @@
 
 *NOTE: Subject to change to only MCU dependent on time*
 
- - [ ] Setup build toolchain for Bela and MCU deployment
- - [ ] Run quick deployment for control example with ```.onnx``` for Bela
- - [ ] Setup $I^2S$ for Bela
+ - [x] Setup build toolchain for ESP32-S3 deployment
+ - [ ] Setup $I^2S$ for ESP32
  - [ ] Write SE inference program in C for MCU using ```.tflite``` model
  - [ ] Get performance for both models in terms of **Latency, Power Consumption, Accuracy**
 
