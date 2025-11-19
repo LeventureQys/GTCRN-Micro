@@ -184,19 +184,6 @@ class GTConvBlock(nn.Module):
                 groups=16,  # fixing for conversion
             )
 
-        # NOTE: NEED TO FIX THIS!
-        # explicit Conv2d for conversion
-        # self.depth_conv = nn.Conv2d(
-        #     hidden_channels,
-        #     hidden_channels,
-        #     kernel_size,
-        #     stride=stride,
-        #     padding=padding,
-        #     dilation=dilation,
-        #     # groups=hidden_channels,
-        #     groups=1,  # fixing for conversion
-        # )
-
         self.depth_bn = nn.BatchNorm2d(hidden_channels)
         self.depth_act = nn.PReLU()
 
@@ -394,7 +381,8 @@ class Encoder(nn.Module):
                     (3, 3),
                     stride=(1, 1),
                     padding=(0, 1),
-                    dilation=(2, 1),
+                    dilation=(1, 1),
+                    # dilation=(2, 1), # switched for LiteRT inference
                     use_deconv=False,
                 ),
                 GTConvBlock(
@@ -403,7 +391,7 @@ class Encoder(nn.Module):
                     (3, 3),
                     stride=(1, 1),
                     padding=(0, 1),
-                    dilation=(2, 1),
+                    dilation=(1, 1),
                     # dilation=(5, 1), # switched for LiteRT inference
                     use_deconv=False,
                 ),
@@ -428,8 +416,8 @@ class Decoder(nn.Module):
                     16,
                     (3, 3),
                     stride=(1, 1),
-                    padding=(2 * 2, 1),
-                    dilation=(2, 1),
+                    padding=(2 * 1, 1),
+                    dilation=(1, 1),
                     # padding=(2 * 5, 1), # switched for LiteRT inference
                     # dilation=(5, 1),
                     use_deconv=True,
@@ -439,8 +427,10 @@ class Decoder(nn.Module):
                     16,
                     (3, 3),
                     stride=(1, 1),
-                    padding=(2 * 2, 1),
-                    dilation=(2, 1),
+                    padding=(2 * 1, 1),
+                    dilation=(1, 1),
+                    # padding=(2 * 2, 1), # switched for LiteRT inference
+                    # dilation=(2, 1),
                     use_deconv=True,
                 ),
                 GTConvBlock(
@@ -533,13 +523,10 @@ class GTCRNMicro(nn.Module):
         # print("********** \nEncoder works\n**********")
 
         feat = self.dpgrnn1(feat)  # (B,16,T,33)
-        print(f"feat dp1 size: {feat.shape}")
         feat = self.dpgrnn2(feat)  # (B,16,T,33)
-        print(f"feat dp2 size: {feat.shape}")
         # print("********** \nDPLSTM works\n**********")
 
         m_feat = self.decoder(feat, en_outs)
-        print(f"feat decoder size: {feat.shape}")
         # print("********** \nDecoder works\n**********")
 
         m = self.erb.bs(m_feat)
@@ -599,9 +586,6 @@ if __name__ == "__main__":
 
     y1 = torch.istft(y1, 512, 256, 512, torch.hann_window(512).pow(0.5))
     y2 = torch.istft(y2, 512, 256, 512, torch.hann_window(512).pow(0.5))
-
-    # y1 = y1.squeeze(0)
-    # y2 = y2.squeeze(0)
 
     print((y1[: 16000 - 256 * 2] - y2[: 16000 - 256 * 2]).abs().max())
     print((y1[16000:] - y2[16000:]).abs().max())

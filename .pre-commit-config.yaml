@@ -22,3 +22,8 @@ repos:
   hooks:
     - id: pydoclint
       args: [--style=google, --check-return-types=False]
+
+- repo: https://github.com/owenlamont/uv-secure
+  rev: 0.15.0
+  hooks:
+    - id: uv-secure

@@ -89,7 +89,7 @@ torch.onnx.export(
     model,
     (input[None]),
     "gtcrn_micro.onnx",
-    opset_version=17,
+    opset_version=16,  # Lowerin opset for LN
     dynamo=False,
     input_names=["audio"],
     output_names=["mask"],
