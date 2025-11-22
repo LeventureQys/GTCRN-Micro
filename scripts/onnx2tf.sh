@@ -4,7 +4,8 @@ set -euo pipefail
 
 # run from root
 ONNX_INPUT="gtcrn_micro/models/onnx/"
-ONNX_FILE=gtcrn_micro.onnx # testing lowered opset 16
+# ONNX_FILE=gtcrn_micro.onnx # testing lowered opset 16
+ONNX_FILE=gtcrn_s3.onnx # testing lowered opset 16
 OUTPUT_PATH="gtcrn_micro/models/tflite/"
 JSON_FILE=replace_gtcrn_micro.json
 CALIB_DATA="${OUTPUT_PATH}tflite_calibration.npy"
@@ -26,4 +27,6 @@ uv run onnx2tf \
 	-cotof \
 	-oiqt \
 	-qt per-channel \
-	-cind "audio" "$CALIB_DATA" "[[[[0.]]]]" "[[[[1.]]]]"
+	-cind "audio" "$CALIB_DATA" "[[[[0.]]]]" "[[[[1.]]]]" \
+	-v debug \
+	-ofgd

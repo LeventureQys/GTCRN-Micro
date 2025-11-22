@@ -90,24 +90,28 @@ class SFE(nn.Module):
         return xs
 
 
-class TRA(nn.Module):
-    """Temporal Recurrent Attention"""
-
-    def __init__(self, channels):
-        super().__init__()
-        self.att_lstm = nn.LSTM(channels, channels * 2, 1, batch_first=True)
-        self.att_fc = nn.Linear(channels * 2, channels)
-        self.att_act = nn.Sigmoid()
-
-    def forward(self, x):
-        """x: (B,C,T,F)"""
-        zt = torch.mean(x.pow(2), dim=-1)  # (B,C,T)
-        at = self.att_lstm(zt.transpose(1, 2))[0]
-        at = self.att_fc(at).transpose(1, 2)
-        at = self.att_act(at)
-        At = at[..., None]  # (B,C,T,1)
-
-        return x * At
+# class TRA(nn.Module):
+#     """Temporal Recurrent Attention"""
+#
+#     def __init__(self, channels):
+#         super().__init__()
+#         self.att_lstm = nn.LSTM(channels, channels * 2, 1, batch_first=True)
+#         self.att_fc = nn.Linear(channels * 2, channels)
+#         self.att_act = nn.Sigmoid()
+#
+#     def forward(self, x):
+#         """x: (B,C,T,F)"""
+#         zt = torch.mean(x.pow(2), dim=-1)  # (B,C,T)
+#         # DEBUG - - -
+#         # at = self.att_lstm(zt.transpose(1, 2))[0]
+#         # at = zt.transpose(1, 2)
+#         at = zt
+#         at = self.att_fc(at).transpose(1, 2)
+#         at = self.att_act(at)
+#         At = at[..., None]  # (B,C,T,1)
+#
+#         return x * At
+#
 
 
 class ConvBlock(nn.Module):
@@ -190,7 +194,7 @@ class GTConvBlock(nn.Module):
         self.point_conv2 = conv_module(hidden_channels, in_channels // 2, 1)
         self.point_bn2 = nn.BatchNorm2d(in_channels // 2)
 
-        self.tra = TRA(in_channels // 2)
+        # self.tra = TRA(in_channels // 2)
 
     def shuffle(self, x1, x2):
         """x1, x2: (B,C,T,F)"""
@@ -209,7 +213,7 @@ class GTConvBlock(nn.Module):
         h1 = self.depth_act(self.depth_bn(self.depth_conv(h1)))
         h1 = self.point_bn2(self.point_conv2(h1))
 
-        h1 = self.tra(h1)
+        # h1 = self.tra(h1)
 
         x = self.shuffle(h1, x2)
 
@@ -279,8 +283,13 @@ class GRNN(nn.Module):
         c1, c2 = torch.chunk(c, chunks=2, dim=-1)
         c1, c2 = c1.contiguous(), c2.contiguous()
         # adjusting outputs and inputs for LSTM
-        y1, (h1, c1) = self.lstm1(x1, (h1, c1))
-        y2, (h2, c2) = self.lstm2(x2, (h2, c2))
+        # DEBUG ----
+        y1 = x1
+        y2 = x2
+
+        # y1, (h1, c1) = self.lstm1(x1, (h1, c1))
+        # y2, (h2, c2) = self.lstm2(x2, (h2, c2))
+
         y = torch.cat([y1, y2], dim=-1)
         h = torch.cat([h1, h2], dim=-1)
         c = torch.cat([c1, c2], dim=-1)
@@ -300,17 +309,23 @@ class DPGRNN(nn.Module):
             input_size=input_size, hidden_size=hidden_size // 2, bidirectional=True
         )
         self.intra_fc = nn.Linear(hidden_size, hidden_size)
-        self.intra_ln = nn.LayerNorm((width, hidden_size), eps=1e-8)
+
+        # adjusting for micro ops
+        # self.intra_ln = nn.LayerNorm((width, hidden_size), eps=1e-8)
+        # self.intra_ln = nn.LayerNorm(hidden_size, eps=1e-8)
 
         self.inter_rnn = GRNN(
             input_size=input_size, hidden_size=hidden_size, bidirectional=False
         )
         self.inter_fc = nn.Linear(hidden_size, hidden_size)
-        self.inter_ln = nn.LayerNorm(((width, hidden_size)), eps=1e-8)
+
+        # adjusting for micro ops
+        # self.inter_ln = nn.LayerNorm(((width, hidden_size)), eps=1e-8)
+        # self.inter_ln = nn.LayerNorm(hidden_size, eps=1e-8)
 
     def forward(self, x):
         """x: (B, C, T, F)"""
-        ## Intra RNN
+        # Intra RNN
         x = x.permute(0, 2, 3, 1)  # (B,T,F,C)
         intra_x = x.reshape(
             x.shape[0] * x.shape[1], x.shape[2], x.shape[3]
@@ -320,10 +335,10 @@ class DPGRNN(nn.Module):
         intra_x = intra_x.reshape(
             x.shape[0], -1, self.width, self.hidden_size
         )  # (B,T,F,C)
-        intra_x = self.intra_ln(intra_x)
+        # intra_x = self.intra_ln(intra_x)
         intra_out = torch.add(x, intra_x)
 
-        ## Inter RNN
+        # Inter RNN
         x = intra_out.permute(0, 2, 1, 3)  # (B,F,T,C)
         inter_x = x.reshape(x.shape[0] * x.shape[1], x.shape[2], x.shape[3])
         inter_x = self.inter_rnn(inter_x)[0]  # (B*F,T,C)
@@ -332,7 +347,7 @@ class DPGRNN(nn.Module):
             x.shape[0], self.width, -1, self.hidden_size
         )  # (B,F,T,C)
         inter_x = inter_x.permute(0, 2, 1, 3)  # (B,T,F,C)
-        inter_x = self.inter_ln(inter_x)
+        # inter_x = self.inter_ln(inter_x)
         inter_out = torch.add(intra_out, inter_x)
 
         dual_out = inter_out.permute(0, 3, 1, 2)  # (B,C,T,F)
