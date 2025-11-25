@@ -219,3 +219,6 @@ __marimo__/
 /esp32_SE/managed_components
 /esp32_SE/sdkconfig.old
 /esp32_SE/sdkconfig
+
+# model viz
+model_visualization.html

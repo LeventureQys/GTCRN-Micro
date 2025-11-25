@@ -11,6 +11,7 @@
 
 #include "tensorflow/lite/micro/all_ops_resolver.h"
 #include "tensorflow/lite/micro/micro_interpreter.h"
+#include "tensorflow/lite/micro/micro_mutable_op_resolver.h"
 #include "tensorflow/lite/schema/schema_generated.h"
 #include "tensorflow/lite/version.h"
 
@@ -18,7 +19,7 @@
 static const char *TAG = "GTCRN_MICRO_TEST";
 
 // Settings
-static const gpio_num_t led_pin = GPIO_NUM_4;
+static const gpio_num_t led_pin = GPIO_NUM_38;
 static const int32_t sleep_time_ms = 200;
 
 static constexpr int kTensorArenaSize = 400 * 1024;
@@ -42,7 +43,9 @@ extern "C" void app_main(void) {
   }
 
   // resolve ops
-  static tflite::AllOpsResolver resolver;
+  /*static tflite::AllOpsResolver resolver;*/
+  // Switching to micro_ops
+  /*static tflite::MicroMutableOpResolver*/
 
   // setup interpreter
   static tflite::MicroInterpreter interpreter(model, resolver, tensor_arena,

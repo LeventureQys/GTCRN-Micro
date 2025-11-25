@@ -1,12 +1,17 @@
+import soundfile as sf
 import torch
+from ai_edge_litert.interpreter import Interpreter
 
 # import numpy as np
 from gtcrn_micro.models.gtcrn_micro import GTCRNMicro
-from ai_edge_litert.interpreter import Interpreter
-import soundfile as sf
 
 
 def model_comparison(input_wav) -> None:
+    """
+
+    Args:
+        input_wav ():
+    """
     # running stft
     input = torch.stft(
         torch.from_numpy(mix),
