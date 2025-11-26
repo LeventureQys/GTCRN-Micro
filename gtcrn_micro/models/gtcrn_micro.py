@@ -1,5 +1,5 @@
 """
-GTCRN-Micro: ShuffleNetV2 + TRA + 2 DPGRNN
+GTCRN-Micro: MCU-focused rebuild of GTCRN
 """
 
 import torch

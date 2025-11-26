@@ -11,6 +11,16 @@ JSON_FILE=replace_gtcrn_micro.json
 # JSON_FILE=replace_gtcrn_s3.json
 CALIB_DATA="${OUTPUT_PATH}tflite_calibration.npy"
 
+# firstly convert the model from PyTorch ->> ONNX
+if [ -e "$ONNX_INPUT$ONNX_FILE" ]; then
+	echo "$ONNX_INPUT$ONNX_FILE exists..."
+else
+	echo "$ONNX_INPUT$ONNX_FILE doesn't exist..."
+	echo "Running Torch -> ONNX conversion"
+	uv run -m gtcrn_micro.utils.torch_converter
+	echo "$ONNX_FILE created in $ONNX_INPUT"
+fi
+
 # double check file exists
 if [ -e "$CALIB_DATA" ]; then
 	echo "$CALIB_DATA exists."

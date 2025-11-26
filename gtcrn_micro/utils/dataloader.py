@@ -1,12 +1,11 @@
 #
-import soundfile as sf
 import librosa
-import torch
-from torch.utils import data
 import numpy as np
-from tqdm import tqdm
+import soundfile as sf
+import torch
 from omegaconf import OmegaConf
-
+from torch.utils import data
+from tqdm import tqdm
 
 # loading up VCTK dataset
 # do on HPC

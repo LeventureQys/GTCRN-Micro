@@ -1,7 +1,7 @@
-import torch
 import numpy as np
-import tensorflow as tf
 import soundfile as sf
+import tensorflow as tf
+import torch
 
 
 # function for creating dataset
@@ -25,6 +25,15 @@ def representative_data_gen(input):
 
 # function for creating quantized model
 def model_quantizer(model_path, representative_data_gen):
+    """
+
+    Args:
+        model_path ():
+        representative_data_gen ():
+
+    Returns:
+
+    """
     # TFLM conversion to int8
     converter = tf.lite.TFLiteConverter.from_saved_model(model_path)
     converter.optimizations = [tf.lite.Optimize.DEFAULT]

@@ -1,9 +1,11 @@
 # used for onnx2tf.sh
 # ----------------
+from pathlib import Path
+
 import numpy as np
 import soundfile as sf
 import torch
-from pathlib import Path
+from numpy.typing import NDArray
 
 # starting with basic data calibration
 # NOTE: Need to improve in the future
@@ -18,7 +20,16 @@ HOP = 256
 
 
 # function to generate stft tensors
-def wav_2_tensor(wav_path: Path):
+def wav_2_tensor(wav_path: Path) -> NDArray[np.float64]:
+    """Transform input to np tensor for model input.
+
+    Args:
+        wav_path (Path): Path to input wavs
+
+    Returns:
+        NDArray[np.float64]: STFT transformed input wav
+
+    """
     mix, fs = sf.read(
         str(wav_path),
         dtype="float32",
@@ -41,6 +52,7 @@ def wav_2_tensor(wav_path: Path):
 
 
 def main():
+    """Generate calibration data set by input wav."""
     # getting .wav files in directory
     # only taking 32 samples for now
     wavs = sorted(CALIB_DATA.glob("*.wav"))[:32]
@@ -52,7 +64,8 @@ def main():
 
     # need to pad or truncate data
     # max frames comes from previously working with conversion
-    max_frames = 973
+    # max_frames = 973
+    max_frames = 32  # changing max frames for lighter model
     padding = []
     # getting every tensor and checking it's shapes
     for tsr in data:

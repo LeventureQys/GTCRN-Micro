@@ -1,9 +1,9 @@
 import torch
 from torch import float64, randn
 from torchmetrics.audio import (
-    ShortTimeObjectiveIntelligibility,
     PerceptualEvaluationSpeechQuality,
     ScaleInvariantSignalNoiseRatio,
+    ShortTimeObjectiveIntelligibility,
 )
 
 

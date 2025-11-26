@@ -21,7 +21,7 @@
 
  - [x] Get UV setup for python and workflow scripts
  - [x] Setup pre-commit hooks
- - [x] Search for models to work off of (GTCRN)
+ - [x] Search for models to work off of (*GTCRN*)
  - [x] setup datasets for offline evaluation
  - [x] Test PyTorch Converters
  - [ ] Setup datasets for training
@@ -37,7 +37,7 @@
  - [x] Reimplement model replacing GRUs and for TFLM
  <!-- - [ ] Run metrics to profile on desktop against onnxruntime inference  -->
  - [x] Make model adjustments to comply with **Torch $\rightarrow$ ONNX $\rightarrow$ TFLite $\rightarrow$ TFLM**
- - [ ] Fix parameter replacement for JSON
+ - [x] Fix parameter replacement for JSON
  - [ ] Train new model
  - [ ] *Potential revisit to add QAT*
 
@@ -49,6 +49,7 @@
  - [ ] Profile and measure accuracy of quanitzed model
  - [ ] Potentially revisit [model design](#model-design) to implement QAT if bad performance 
  - [ ] Report measure of # of params and MMACs, ensure can fit on-device or adjust
+ - [ ] Scope new hardware
 
 
 - - - 
@@ -57,7 +58,8 @@
 
 *NOTE: Subject to change to only MCU dependent on time*
 
- - [x] Setup build toolchain for ESP32-S3 deployment
+ - [x] ~~Setup build toolchain for ESP32-S3 deployment~~
+ - [ ] Setup build toolchain for new hardware...
  - [ ] Setup $I^2S$ for ESP32
  - [ ] Write SE inference program in C for MCU using ```.tflite``` model
  - [ ] Get performance for both models in terms of **Latency, Power Consumption, Accuracy**
