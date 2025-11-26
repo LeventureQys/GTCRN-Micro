@@ -31,7 +31,10 @@ from gtcrn_micro.models.gtcrn_micro import GTCRNMicro
 
 
 def torch2onnx(
-    model: nn.Module, sample_input: NDArray[np.float64], time_chunk: int
+    model: nn.Module,
+    sample_input: NDArray[np.float64],
+    time_chunk: int,
+    model_name: str,
 ) -> None:
     """Convert Torch model to .onnx.
 
@@ -39,7 +42,9 @@ def torch2onnx(
         model (nn.Module): Model to convert to onnx
         sample_input (NDArray[np.float64]): Sample small input for conversion
         time_chunk (int): Time in samples for the amount of audio you want for your input
+        model_name (str): Name of onnx file that will be saved - "name".onnx
     """
+    ONNX_PATH = "./gtcrn_micro/models/onnx/"
     # testing that forward pass works!
     assert fs == 16000
     # running stft
@@ -74,7 +79,7 @@ def torch2onnx(
     torch.onnx.export(
         model,
         (input_small[None]),  # Exporting with small input
-        "gtcrn_micro.onnx",
+        f"{ONNX_PATH}{model_name}.onnx",
         opset_version=16,  # Lowerin opset for LN
         dynamo=False,
         input_names=["audio"],
@@ -86,7 +91,7 @@ def torch2onnx(
     )
 
     # checking the model
-    onnx_model = onnx.load("gtcrn_micro.onnx")
+    onnx_model = onnx.load(f"{ONNX_PATH}{model_name}.onnx")
     onnx.checker.check_model(onnx_model)
     # print ONNX input shape
     print("Onnx input shape:\n----------")
@@ -102,7 +107,6 @@ if __name__ == "__main__":
         "./gtcrn_micro/data/DNS3/V2_V3_DNSChallenge_Blindset/noisy_blind_testset_v3_challenge_withSNR_16k/ms_realrec_emotional_female_SNR_17.74dB_headset_A2AHXGFXPG6ZSR_Water_far_Laughter_12.wav",
         dtype="float32",
     )
-    print(type(mix))
 
-    # torch2onnx(model, mix, time_chunk=126)
-    torch2onnx(model, mix, time_chunk=32)
+    # converting model
+    torch2onnx(model, mix, time_chunk=32, model_name="gtcrn_micro")

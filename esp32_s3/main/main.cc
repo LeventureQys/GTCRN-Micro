@@ -31,7 +31,7 @@ static const gpio_num_t led_pin = GPIO_NUM_38;
 static const int32_t sleep_time_ms = 200;
 
 // allocate Tensor Arena size on PSRAM
-constexpr int kTensorArenaSize = 7500 * 1024;
+constexpr int kTensorArenaSize = 300 * 1024;
 uint8_t *tensor_arena = nullptr;
 
 // logging
