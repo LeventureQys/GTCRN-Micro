@@ -2,8 +2,8 @@
 GTCRN-Micro: ShuffleNetV2 + TRA + 2 DPGRNN
 """
 
-import torch
 import numpy as np
+import torch
 import torch.nn as nn
 from einops import rearrange
 
@@ -458,7 +458,7 @@ class GTCRNMicro(nn.Module):
         self.encoder = Encoder()
 
         self.dptcn1 = DPTCN(channels=16, n_layers=4, kernel_size=3, dilation=2)
-        self.dptcn2 = DPTCN(channels=16, n_layers=4, kernel_size=3, dilation=2)
+        # self.dptcn2 = DPTCN(channels=16, n_layers=4, kernel_size=3, dilation=2)
 
         self.decoder = Decoder()
 
@@ -472,7 +472,9 @@ class GTCRNMicro(nn.Module):
 
         spec_real = spec[..., 0].permute(0, 2, 1)
         spec_imag = spec[..., 1].permute(0, 2, 1)
-        spec_mag = torch.sqrt(spec_real**2 + spec_imag**2 + 1e-12)
+        # spec_mag = torch.sqrt(spec_real**2 + spec_imag**2 + 1e-12)
+        # removing sqrt for micro
+        spec_mag = spec_real**2 + spec_imag**2
         feat = torch.stack([spec_mag, spec_real, spec_imag], dim=1)  # (B,3,T,257)
 
         # print("\n----------\nDebug:\n********** \nSpec works\n**********")
@@ -486,8 +488,9 @@ class GTCRNMicro(nn.Module):
         # print("********** \nEncoder works\n**********")
 
         feat = self.dptcn1(feat)  # (B,16,T,33)
-        feat = self.dptcn2(feat)  # (B,16,T,33)
-        print("********** \nDPLSTM works\n**********")
+        # shrinking model
+        # feat = self.dptcn2(feat)  # (B,16,T,33)
+        # print("********** \nDPLSTM works\n**********")
 
         m_feat = self.decoder(feat, en_outs)
         # print("********** \nDecoder works\n**********")

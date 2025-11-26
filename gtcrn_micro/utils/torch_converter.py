@@ -105,4 +105,4 @@ if __name__ == "__main__":
     print(type(mix))
 
     # torch2onnx(model, mix, time_chunk=126)
-    # torch2onnx(model, mix, time_chunk=64)
+    torch2onnx(model, mix, time_chunk=32)

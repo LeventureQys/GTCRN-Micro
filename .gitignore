@@ -221,4 +221,5 @@ __marimo__/
 /esp32_SE/sdkconfig
 
 # model viz
-model_visualization.html
+*model_visualization.html
+gtcrn_micro/utils/tflite_visualize.py
