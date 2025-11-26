@@ -64,7 +64,8 @@ def main():
 
     # need to pad or truncate data
     # max frames comes from previously working with conversion
-    max_frames = 973
+    # max_frames = 973
+    max_frames = 64  # changing max frames for lighter model
     padding = []
     # getting every tensor and checking it's shapes
     for tsr in data:
