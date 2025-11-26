@@ -338,26 +338,26 @@ class Encoder(nn.Module):
                     dilation=(1, 1),
                     use_deconv=False,
                 ),
-                GTConvBlock(
-                    16,
-                    16,
-                    (3, 3),
-                    stride=(1, 1),
-                    padding=(0, 1),
-                    dilation=(1, 1),
-                    # dilation=(2, 1), # switched for LiteRT inference
-                    use_deconv=False,
-                ),
-                GTConvBlock(
-                    16,
-                    16,
-                    (3, 3),
-                    stride=(1, 1),
-                    padding=(0, 1),
-                    dilation=(1, 1),
-                    # dilation=(5, 1), # switched for LiteRT inference
-                    use_deconv=False,
-                ),
+                # GTConvBlock(
+                #     16,
+                #     16,
+                #     (3, 3),
+                #     stride=(1, 1),
+                #     padding=(0, 1),
+                #     dilation=(1, 1),
+                #     # dilation=(2, 1), # switched for LiteRT inference
+                #     use_deconv=False,
+                # ),
+                # GTConvBlock(
+                #     16,
+                #     16,
+                #     (3, 3),
+                #     stride=(1, 1),
+                #     padding=(0, 1),
+                #     dilation=(1, 1),
+                #     # dilation=(5, 1), # switched for LiteRT inference
+                #     use_deconv=False,
+                # ),
             ]
         )
 
@@ -374,28 +374,28 @@ class Decoder(nn.Module):
         super().__init__()
         self.de_convs = nn.ModuleList(
             [
-                GTConvBlock(
-                    16,
-                    16,
-                    (3, 3),
-                    stride=(1, 1),
-                    padding=(2 * 1, 1),
-                    dilation=(1, 1),
-                    # padding=(2 * 5, 1), # switched for LiteRT inference
-                    # dilation=(5, 1),
-                    use_deconv=True,
-                ),
-                GTConvBlock(
-                    16,
-                    16,
-                    (3, 3),
-                    stride=(1, 1),
-                    padding=(2 * 1, 1),
-                    dilation=(1, 1),
-                    # padding=(2 * 2, 1), # switched for LiteRT inference
-                    # dilation=(2, 1),
-                    use_deconv=True,
-                ),
+                # GTConvBlock(
+                #     16,
+                #     16,
+                #     (3, 3),
+                #     stride=(1, 1),
+                #     padding=(2 * 1, 1),
+                #     dilation=(1, 1),
+                #     # padding=(2 * 5, 1), # switched for LiteRT inference
+                #     # dilation=(5, 1),
+                #     use_deconv=True,
+                # ),
+                # GTConvBlock(
+                #     16,
+                #     16,
+                #     (3, 3),
+                #     stride=(1, 1),
+                #     padding=(2 * 1, 1),
+                #     dilation=(1, 1),
+                #     # padding=(2 * 2, 1), # switched for LiteRT inference
+                #     # dilation=(2, 1),
+                #     use_deconv=True,
+                # ),
                 GTConvBlock(
                     16,
                     16,
@@ -472,9 +472,9 @@ class GTCRNMicro(nn.Module):
 
         spec_real = spec[..., 0].permute(0, 2, 1)
         spec_imag = spec[..., 1].permute(0, 2, 1)
-        # spec_mag = torch.sqrt(spec_real**2 + spec_imag**2 + 1e-12)
+        spec_mag = torch.sqrt(spec_real**2 + spec_imag**2 + 1e-12)
         # removing sqrt for micro
-        spec_mag = spec_real**2 + spec_imag**2
+        # spec_mag = spec_real**2 + spec_imag**2
         feat = torch.stack([spec_mag, spec_real, spec_imag], dim=1)  # (B,3,T,257)
 
         # print("\n----------\nDebug:\n********** \nSpec works\n**********")

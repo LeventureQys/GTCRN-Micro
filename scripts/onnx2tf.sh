@@ -29,8 +29,8 @@ uv run onnx2tf \
 	-oiqt \
 	-qt per-channel \
 	-cind "audio" "$CALIB_DATA" "[[[[0.]]]]" "[[[[1.]]]]" \
-	-rtpo PReLU \
+	\
 	-osd \
 	-b 1 \
 	-v debug \
-	-ofgd
+	-ofgd # -rtpo PReLU \
