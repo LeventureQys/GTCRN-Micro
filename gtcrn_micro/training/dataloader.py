@@ -122,13 +122,13 @@ class DNS3Dataset(torch.utils.data.Dataset):
         if self.random_start:
             begin_s = int(np.random.uniform(0, 10 - self.length_seconds)) * self.fs
             noisy, _ = sf.read(
-                noisy_list[idx],
+                noisy_list[index],
                 dtype="float32",
                 start=begin_s,
                 stop=begin_s + self.length_samples,
             )
             clean, _ = sf.read(
-                noisy_list[idx].replace("noisy", "clean"),
+                noisy_list[index].replace("noisy", "clean"),
                 dtype="float32",
                 start=begin_s,
                 stop=begin_s + self.length_samples,
@@ -136,13 +136,13 @@ class DNS3Dataset(torch.utils.data.Dataset):
 
         else:
             noisy, _ = sf.read(
-                noisy_list[idx],
+                noisy_list[index],
                 dtype="float32",
                 start=0,
                 stop=self.length_samples,
             )
             clean, _ = sf.read(
-                noisy_list[idx].replace("noisy", "clean"),
+                noisy_list[index].replace("noisy", "clean"),
                 dtype="float32",
                 start=0,
                 stop=self.length_samples,
