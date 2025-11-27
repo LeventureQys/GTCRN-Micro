@@ -64,3 +64,4 @@ trainer:
   clip_grad_norm_value: 3.0
   exp_path: /gtcrn_micro/data/DNS3/exp_gtcrn_micro
   resume: false
+  resume_datetime: 2025-11-26-00h00m

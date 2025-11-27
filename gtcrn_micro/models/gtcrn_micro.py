@@ -406,7 +406,12 @@ class Mask(nn.Module):
 
 
 class GTCRNMicro(nn.Module):
-    def __init__(self):
+    def __init__(
+        self,
+        n_fft=512,
+        hop_len=256,
+        win_len=512,
+    ):
         super().__init__()
         self.erb = ERB(65, 64)
         # self.sfe = SFE(3, 1)

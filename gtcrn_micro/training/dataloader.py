@@ -1,3 +1,5 @@
+# Original author Xiaobin Rong
+# Source: SEtrain: https://github.com/Xiaobin-Rong/SEtrain
 # Shoutout SEtrain
 from random import sample
 
