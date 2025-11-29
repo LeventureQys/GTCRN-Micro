@@ -811,6 +811,7 @@ dependencies = [
     { name = "ruff" },
     { name = "simple-onnx-processing-tools", version = "1.1.31", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "simple-onnx-processing-tools", version = "1.1.32", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
+    { name = "sniffio" },
     { name = "soundfile" },
     { name = "tensorflow" },
     { name = "tf-keras" },
@@ -852,6 +853,7 @@ requires-dist = [
     { name = "pytorch-tcn", specifier = "==1.0.0" },
     { name = "ruff", specifier = ">=0.14.0" },
     { name = "simple-onnx-processing-tools", specifier = ">=1.1.31" },
+    { name = "sniffio", specifier = ">=1.3.1" },
     { name = "soundfile", specifier = ">=0.13.1" },
     { name = "tensorflow", specifier = "==2.19.0" },
     { name = "tf-keras", specifier = "==2.19.0" },
@@ -3453,6 +3455,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/cb/74/82cec386e8a296632fca024920d063225c01403c191eadc13b2e65c81a9c/sng4onnx-1.0.4.tar.gz", hash = "sha256:836022cd466b9afa4cbe118f9d6c23b8444cbe200601798ac314294c5f243eee", size = 5041, upload-time = "2024-05-07T05:44:30.62Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/6f/d8/9f6fc80c341d66473896edf58f02f53bbb60a7b0c0d927927d8c8fb3e916/sng4onnx-1.0.4-py3-none-any.whl", hash = "sha256:1784d65df96c78532cfd755559a331471e80ccd42ded78044b40ec0d5d708ab4", size = 5915, upload-time = "2024-05-07T05:44:29.594Z" },
+]
+
+[[package]]
+name = "sniffio"
+version = "1.3.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/a2/87/a6771e1546d97e7e041b6ae58d80074f81b7d5121207425c964ddf5cfdbd/sniffio-1.3.1.tar.gz", hash = "sha256:f4324edc670a0f49750a81b895f35c3adb843cca46f0530f79fc1babb23789dc", size = 20372, upload-time = "2024-02-25T23:20:04.057Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e9/44/75a9c9421471a6c4805dbf2356f7c181a29c1879239abab1ea2cc8f38b40/sniffio-1.3.1-py3-none-any.whl", hash = "sha256:2f6da418d1f1e0fddd844478f41680e794e6051915791a034ff65e5f100525a2", size = 10235, upload-time = "2024-02-25T23:20:01.196Z" },
 ]
 
 [[package]]
