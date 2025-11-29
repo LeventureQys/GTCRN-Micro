@@ -1,4 +1,4 @@
-# Source: Adpated from - https://github.com/Xiaobin-Rong/SEtrain/blob/plus/distributed_utils.py
+# Source: Adpated from - https://github.com/Xiaobin-Rong/SEtrain
 import argparse
 import os
 import random
@@ -11,16 +11,16 @@ import numpy as np
 import soundfile as sf
 import torch
 import torch.distributed as dist
-import torch.multiprocessing as mp
 from joblib import Parallel, delayed
 from omegaconf import OmegaConf
 from pesq import pesq
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
+import torch.multiprocessing as mp
 
+from gtcrn_micro.models.gtcrn_micro import GTCRNMicro as Model
 from gtcrn_micro.dataloader import DNS3Dataset as Dataset
 from gtcrn_micro.loss import HybridLoss as Loss
-from gtcrn_micro.models.gtcrn_micro import GTCRNMicro as Model
 from gtcrn_micro.utils.distributed_utils import reduce_value
 from gtcrn_micro.utils.scheduler import LinearWarmupCosineAnnealingLR as WarmupLR
 
@@ -304,7 +304,7 @@ class Trainer:
         total_pesq_score = 0
 
         self.validation_bar = tqdm(self.validation_dataloader, ncols=123)
-        for step, (noisy, clean) in enumerate(self.validation_dataloader, 1):
+        for step, (noisy, clean) in enumerate(self.validation_bar, 1):
             noisy = noisy.to(self.device)
             noisy_spec = torch.stft(
                 noisy,
@@ -331,10 +331,28 @@ class Trainer:
                 loss = reduce_value(loss)
             total_loss += loss.item()
 
-            clean = clean.cpu().numpy()
             # converting enhanced spec back to wave for pesq batch loss
+            spec_enh_complex = torch.complex(enhanced[..., 0], enhanced[..., 1])
+            enhanced_wave = torch.istft(
+                spec_enh_complex,
+                n_fft=512,
+                hop_length=256,
+                win_length=512,
+                window=torch.hann_window(512, device=self.device),
+            )
 
-            enhanced = enhanced.detach().cpu().numpy()
+            # Match length to clean for PESQ / writing
+            if enhanced_wave.shape[1] < clean.shape[1]:
+                enhanced_wave = torch.nn.functional.pad(
+                    enhanced_wave, (0, clean.shape[1] - enhanced_wave.shape[1])
+                )
+            elif enhanced_wave.shape[1] > clean.shape[1]:
+                enhanced_wave = enhanced_wave[:, : clean.shape[1]]
+
+            # enhanced = enhanced.detach().cpu().numpy()
+            # changing enhanced wave back to np
+            clean = clean.cpu().numpy()
+            enhanced = enhanced_wave.detach().cpu().numpy()
             pesq_score_batch = Parallel(n_jobs=1)(
                 delayed(pesq)(16000, c, e, "wb") for c, e in zip(clean, enhanced)
             )

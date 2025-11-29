@@ -18,7 +18,7 @@ from tqdm import tqdm
 
 # need to switch on HPC
 DNS3_TRAIN = "./gtcrn_micro/data/DNS3/noisy"
-DNS3_VALID = "./gtcrn_micro/data/DNS3/noisy"
+DNS3_VALID = "./gtcrn_micro/data/DNS3_val/noisy"
 
 
 # ------
