@@ -2,6 +2,7 @@
 import os
 
 import librosa
+import numpy as np
 import soundfile as sf
 
 # import shutil
@@ -12,14 +13,22 @@ from tqdm import tqdm
 from gtcrn_micro.models.gtcrn_micro import GTCRNMicro as Model
 
 
+# NEEDED FOR DNS3
+def _extract_fileid_from_noisy(path: str):
+    """Grab the fileid substring from the *noisy* filename."""
+    base = os.path.basename(path)
+    if "fileid_" not in base:
+        return None
+    return base.split("fileid_")[-1].split(".")[0]
+
+
 # for bulk inference
 def main(args):
     cfg_infer = OmegaConf.load(args.config)
     cfg_network = OmegaConf.load(cfg_infer.network.config)
 
     noisy_folder = cfg_infer.test_dataset.noisy_dir
-    # uncomment for
-    # clean_folder = cfg_infer.test_dataset.clean_dir
+    clean_folder = cfg_infer.test_dataset.clean_dir
     enh_folder = cfg_infer.network.enh_folder
     os.makedirs(enh_folder, exist_ok=True)
 
@@ -37,6 +46,8 @@ def main(args):
     inf_scp_list = []
     ref_scp_list = []
     for wav_name in tqdm(noisy_wavs):
+        # getting path for fixing file matching
+        noisy_path = os.path.join(noisy_folder, wav_name)
         # converting audio to sample rate if needed
         noisy, fs = sf.read(os.path.join(noisy_folder, wav_name), dtype="float32")
 
@@ -45,7 +56,7 @@ def main(args):
             fs = 16000
         assert fs == 16000
 
-        ## inference
+        # inference
         input = torch.stft(
             torch.from_numpy(noisy),
             512,
@@ -64,14 +75,39 @@ def main(args):
             output, 512, 256, 512, torch.hann_window(512).pow(0.5), return_complex=False
         )
 
+        # fixing paths
+        fileid = _extract_fileid_from_noisy(noisy_path)
+        if fileid is None:
+            raise RuntimeError(f"Unable to extract: {noisy_path}")
+
+        clean_name = f"clean_fileid_{fileid}.wav"
+        ref_path = os.path.join(clean_folder, clean_name)
+
+        if not os.path.exists(ref_path):
+            raise FileNotFoundError(
+                f"Clean file not found for {clean_name}, fileid={fileid}:\n {ref_path}"
+            )
+
+        clean, fs_clean = sf.read(ref_path, dtype="float32")
+        if fs_clean != fs:
+            clean = librosa.resample(y=clean, orig_sr=fs_clean, target_sr=fs)
+            fs_clean = fs
+        assert fs_clean == fs
+
+        # fixing shape issues
+        if enhanced.shape[0] < clean.shape[0]:
+            pad = clean.shape[0] - enhanced.shape[0]
+            enhanced = np.pad(enhanced, (0, pad), mode="constant")
+        elif enhanced.shape[0] > clean.shape[0]:
+            enhanced = enhanced[: clean.shape[0]]
+
         uid = wav_name.split(".wav")[0]
         enh_path = os.path.join(enh_folder, uid + "_enh.wav")
-        # ref_path = os.path.join(clean_folder, wav_name)
-
-        inf_scp_list.append([uid, enh_path])
-        # ref_scp_list.append([uid, ref_path])
 
         sf.write(enh_path, enhanced, fs)
+
+        inf_scp_list.append([uid, enh_path])
+        ref_scp_list.append([uid, ref_path])
 
     # Save paths into scp file for evaluation
     with open(os.path.join(enh_folder, "inf.scp"), "w") as f:
