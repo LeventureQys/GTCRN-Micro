@@ -30,7 +30,7 @@ The motivation for this project comes from a general interest in designing speec
 ### Setup
 <details>
 
-##### Clone the project:
+#### Clone the project:
 ```bash
 git clone https://github.com/benjaminglidden/GTCRN-Micro.git
 cd GTCRN-Micro
@@ -38,6 +38,7 @@ cd GTCRN-Micro
 This project uses uv as the dependency manager. 
 - To get setup with the project dependencies, first thing is to make sure [uv](https://docs.astral.sh/uv/) is installed on your device:
 
+#### Installing uv:
 **Linux & Mac OS**
 
 From the **terminal**:
@@ -62,7 +63,7 @@ From **PowerShell:**
 powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
 ```
 
-#####  Verify UV installation
+####  Verify UV installation
 
  - To verify you've installed it correctly, from your Terminal (or PowerShell), run:
 ```
@@ -70,7 +71,7 @@ uv --version
 ```
  - You should be returned a version of UV
 
-##### Install the dependencies
+#### Install the dependencies
 ```bash
 uv sync
 ```
@@ -87,7 +88,7 @@ uv sync
 *WIP*
 
 - Quantized tflite files can be found in [tflite](./gtcrn_micro/models/tflite/)
-     - [Calibration data](./gtcrn_micro/models/tflite/tflite_calibration.npy) & the necessary [replacement .json](./gtcrn_micro/models/tflite/replace_gtcrn_micro.json) are there for example if you want to recreate the quantization
+     - The necessary [replacement .json](./gtcrn_micro/models/tflite/replace_gtcrn_micro.json) is there for example if you want to recreate the quantization
 ...
 - - - 
 
@@ -112,14 +113,7 @@ Current model architecture in [gtcrn_micro.py](./gtcrn_micro/models/gtcrn_micro.
 - [ ] Setup Streaming converter for chosen architecture
 - [ ] Create QAT training setup to run on HPC
 
-Chosen hardware for deployment will the **STM32H7**
-
-##### *Update 11/26/2025:*
-
-Currently the model architecture needs to be stripped drown significantly, not just changing incompatible units, to invoke without tons of latency on the *ESP32-S3*.
-
-With that, the current focus is to train the adjusted, but quantizable architecture in [gtcrn_micro.py](./gtcrn_micro/models/gtcrn_micro.py), and target different hardware depending on the model performance.
-
+Chosen hardware for deployment will be either the **ESP32-S3** or the **STM32H7** if the model is too large still for the ESP32
 
 - - -
 ## Acknowledgements
