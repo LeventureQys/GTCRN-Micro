@@ -21,11 +21,3 @@ echo "Running normal training, single GPU"
 # for multiple GPUs
 # uv run python -m gtcrn_micro.train -C gtcrn_micro/conf/cfg_train_DNS3.yaml -D 0,1,2,3
 # echo "Running normal training, mult. GPUs"
-
-# for QAT training
-# uv run python -m gtcrn_micro.train_qat -C gtcrn_micro/conf/cfg_train_DNS3.yaml -D 0
-# echo "Running QAT training, single GPU"
-
-# for multiple GPUs
-# uv run python -m gtcrn_micro.train_qat -C gtcrn_micro/conf/cfg_train_DNS3.yaml -D 0,1,2,3
-# echo "Running QAT training, multiple GPUs"
