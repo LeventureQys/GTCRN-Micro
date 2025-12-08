@@ -27,6 +27,7 @@
 
 | Model            | Quantization | SDR  | SI-SNR | PESQ | STOI |
 |------------------|-------------|------|--------|------|------|
+| Noisy Baseline || 3.39 | 3.39 | 1.40 | 0.79 |
 | GTCRN-Micro    | None     | 8.72  | 8.39    | 1.79  | 0.82  |
 | GTCRN-Micro  (.tflite)   | int8        | ... | ...   | ... | ... |
 | GTCRN-Micro Streaming    | None     | ...  | ...    | ...  | ...  |

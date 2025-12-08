@@ -96,12 +96,12 @@ uv sync
 ## Current Results (DNS3)
 
 **Offline GTCRN-Micro** evaluated on synthetically generated DNS3 test subset:
-| Metric | Score |
-|--------|-------|
-| SDR    | 8.72 |
-| SI-SNR | 8.39 |
-| PESQ   | 1.79 |
-| STOI   | 0.82 |
+| Metric | Noisy | Score | $\Delta$|
+|--------|-------|--------|-------|
+| SDR    | 3.39 | 8.72 | **+5.33** |
+| SI-SNR | 3.39 | 8.39 | **+5.0**| 
+| PESQ   | 1.43 | 1.79 | **+0.36**| 
+| STOI   | 0.79 | 0.82 | **+0.03**| 
 
 More details can be found in [./gtcrn_micro](./gtcrn_micro/README.md)
 - - - 
