@@ -97,6 +97,7 @@ def output_test() -> None:
 
     y_q = interpreter.get_tensor(output_details[0]["index"])
 
+    # dequantizing for comparison
     if output_details[0]["dtype"] == np.int8:
         tflite_output = (y_q.astype(np.float32) - out_zero) * out_scale
     else:
