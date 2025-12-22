@@ -1,5 +1,5 @@
 # Original authors: Xiaobin Rong, Xiaohuai Le
-# Source: SEtrain: https://github.com/Xiaobin-Rong/gtcrn
+# Source: GTCRN: https://github.com/Xiaobin-Rong/gtcrn
 
 from typing import Tuple, Union
 
@@ -51,6 +51,8 @@ class StreamConv1d(nn.Module):
 
         Returns: Conv output at time k given cache, output cache (k-1) inputs for next step
         """
+        print(f"\nx shape: {x.shape}")
+        print(f"\ncache shape: {cache.shape}")
         input = torch.cat([cache, x], dim=-1)
         output = self.Conv1d(input)
         out_cache = input[..., 1:]
