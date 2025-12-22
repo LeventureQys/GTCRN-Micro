@@ -11,13 +11,11 @@ import numpy as np
 import soundfile as sf
 import torch
 import torch.nn as nn
-from torch.autograd import forward_ad
 from tqdm import tqdm
 
 from gtcrn_micro.models.gtcrn_micro import GTCRNMicro
 from gtcrn_micro.streaming.conversion.convert import convert_to_stream
 from gtcrn_micro.streaming.conversion.convolution import (
-    StreamConv1d,
     StreamConv2d,
     StreamConvTranspose2d,
 )
