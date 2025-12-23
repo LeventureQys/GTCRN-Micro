@@ -34,24 +34,21 @@ def convert_to_stream(stream_model, model) -> None:
 
         # adjusting the weight layouts for streaming ConvTranspose2d
         elif key.replace("ConvTranspose2d.", "") in og_state_dict.keys():
+            src_key = key.replace("ConvTranspose2d.", "")
             if key.endswith("weight"):
-                if (
-                    new_state_dict[key].shape
-                    != og_state_dict[key.replace("ConvTranspose2d.", "")].shape
-                ):
-                    new_state_dict[key] = torch.flip(
-                        og_state_dict[key.replace("ConvTranspose2d.", "")].permute(
-                            [1, 0, 2, 3]
-                        ),
-                        dims=[-2, -1],
-                    )
-                else:
-                    new_state_dict[key] = torch.flip(
-                        og_state_dict[key.replace("ConvTranspose2d.", "")],
-                        dims=[-2, -1],
-                    )
+                # flipping weights for streaming
+                weights = og_state_dict[src_key]
+                weights = weights.permute(1, 0, 2, 3).contiguous()
+                weights = torch.flip(weights, dims=[-2, -1])
+
+                assert weights.shape == new_state_dict[key].shape, (
+                    weights.shape,
+                    new_state_dict[key].shape,
+                )
+                new_state_dict[key] = weights
+
             else:
-                new_state_dict[key] = og_state_dict[key.replace("ConvTranspose2d.", "")]
+                new_state_dict[key] = og_state_dict[src_key]
 
         else:
             raise (ValueError("Key error!"))

@@ -1,6 +1,3 @@
-## NOTE: TODOS: TCN STREAMING, TRALite STREAMING
-
-# DO NOT USE, NEEDS TO BE REFACTORED. RETURNING TO THIS
 """
 GTCRN-Micro-Stream: MCU-focused rebuild of GTCRN, setup with streaming caching
 """
@@ -131,15 +128,6 @@ class TRALite(nn.Module):
     def forward(self, x, tra_cache):
         e = (x * x).mean(dim=-1)
 
-        # if self.L == 0:
-        #     # tra_cache = None
-        #     y, tra_cache = self.depth_conv(e, cache=tra_cache)
-        # else:
-        #     if tra_cache is None:
-        #         tra_cache = self.init_cache(x.size(0), device=x.device, dtype=x.dtype)
-        #
-        #     y, tra_cache = self.depth_conv(e, cache=tra_cache)
-
         assert tra_cache is None or tra_cache.shape[1] == e.shape[1], (
             tra_cache.shape,
             e.shape,
@@ -214,17 +202,6 @@ class StreamGTConvBlock(nn.Module):
         self.point_bn1 = nn.BatchNorm2d(hidden_channels)
         self.point_act = nn.PReLU()
 
-        # Streaming!
-        # self.depth_conv = stream_conv_module(
-        #     hidden_channels,
-        #     hidden_channels,
-        #     kernel_size,
-        #     stride=stride,
-        #     padding=padding,
-        #     dilation=dilation,
-        #     # groups=hidden_channels,
-        #     groups=1,  # fixing for conversion
-        # )
         if use_deconv:
             self.depth_conv = stream_conv_module(
                 hidden_channels,
@@ -261,7 +238,6 @@ class StreamGTConvBlock(nn.Module):
         x = torch.stack([x1, x2], dim=1)
         x = x.transpose(1, 2).contiguous()  # (B,C,2,T,F)
         # adjusting for streaming
-        # x = rearrange(x, "b c g t f -> b (c g) t f")  # (B,2C,T,F)
         x = x.view(x.shape[0], -1, x.shape[3], x.shape[4])
 
         return x
@@ -286,7 +262,7 @@ class StreamGTConvBlock(nn.Module):
         return x, conv_cache, tra_cache
 
 
-class TCN(nn.Module):
+class StreamTCN(nn.Module):
     """
     Streaming Temporal Convolutional Block.
     """
@@ -294,7 +270,8 @@ class TCN(nn.Module):
     def __init__(self, channels, kernel_size=3, dilation=1) -> None:
         super().__init__()
         # padding setup
-        self.pad = dilation * (kernel_size - 1)
+        # self.pad = dilation * (kernel_size - 1)
+        self.L = (kernel_size - 1) * dilation
 
         # conv1
         self.conv1 = nn.Conv2d(channels, channels, kernel_size=1, stride=1, padding=0)
@@ -302,7 +279,7 @@ class TCN(nn.Module):
         self.act1 = nn.PReLU()
 
         # dep temporal conv
-        self.conv2 = nn.Conv2d(
+        self.conv2 = StreamConv2d(
             channels,
             channels,
             kernel_size=(kernel_size, 1),
@@ -319,9 +296,10 @@ class TCN(nn.Module):
         self.bn3 = nn.BatchNorm2d(channels)
         self.act3 = nn.PReLU()
 
-    def forward(self, x):
+    def forward(self, x, tcn_cache):
         """
         x: (batch, seq length, input size, freq bins)
+        tcn_cache: (batch, seq length, input size: (k-1)*dilation, freq bins)
         """
 
         # we are going to use a residual connection within this block
@@ -330,19 +308,18 @@ class TCN(nn.Module):
         # first conv pass
         y1 = self.act1(self.bn1(self.conv1(x)))
 
-        # doing padding
-        y1 = nn.functional.pad(y1, [0, 0, self.pad, 0])
         # Conv2 pass
-        y2 = self.act2(self.bn2(self.conv2(y1)))
+        y2, tcn_cache = self.conv2(y1, tcn_cache)
+        y2 = self.act2(self.bn2(y2))
 
         # conv 3 but doing the activation with the resid
         y3 = self.bn3(self.conv3(y2))
 
         res = y3 + residual
-        return self.act3(res)
+        return self.act3(res), tcn_cache
 
 
-class GTCN(nn.Module):
+class StreamGTCN(nn.Module):
     """ """
 
     def __init__(self, channels, n_layers=4, kernel_size=3, dilation=2) -> None:
@@ -351,19 +328,26 @@ class GTCN(nn.Module):
         blocks = []
         d = 1
         for i in range(n_layers):
-            blocks.append(TCN(channels=channels, kernel_size=kernel_size, dilation=d))
+            blocks.append(
+                StreamTCN(channels=channels, kernel_size=kernel_size, dilation=d)
+            )
             d *= dilation  # increases each block
 
         self.blocks = nn.ModuleList(blocks)
 
-    def forward(self, x):
+    def forward(self, x, tcn_cache):
         """
         x: (B, C, T, F).
+        tcn_cache: (B, C, 2*d, F)
         """
-        for tcn in self.blocks:
-            x = tcn(x)
 
-        return x
+        # new cache to hold for each layer
+        new_cache = []
+        for tcn, cache in zip(self.blocks, tcn_cache):
+            x, cache = tcn(x, cache)
+            new_cache.append(cache)
+
+        return x, new_cache
 
 
 class StreamEncoder(nn.Module):
@@ -547,14 +531,14 @@ class StreamGTCRNMicro(nn.Module):
 
         self.encoder = StreamEncoder()
 
-        self.gtcn1 = GTCN(channels=16, n_layers=4, kernel_size=3, dilation=2)
-        self.gtcn2 = GTCN(channels=16, n_layers=4, kernel_size=3, dilation=2)
+        self.gtcn1 = StreamGTCN(channels=16, n_layers=4, kernel_size=3, dilation=2)
+        self.gtcn2 = StreamGTCN(channels=16, n_layers=4, kernel_size=3, dilation=2)
 
         self.decoder = StreamDecoder()
 
         self.mask = Mask()
 
-    def forward(self, spec, conv_cache, tra_cache):
+    def forward(self, spec, conv_cache, tra_cache, tcn_cache):
         """
         spec: (B, F, T, 2)
         conv_cache: [en_cache, de_cache], (2, B, C, 8(kT-1), F) = (2, 1, 16, 16, 33)
@@ -570,13 +554,12 @@ class StreamGTCRNMicro(nn.Module):
         feat = self.sfe(feat)  # sfe-lite (B, 3, T, 129)
 
         # streaming change
-        # print(f"\nDEBUG\n-------\nConv cache:{conv_cache[0]}\n--------")
         feat, en_outs, conv_cache[0], tra_cache[0] = self.encoder(
             feat, conv_cache[0], tra_cache[0]
         )
 
-        feat = self.gtcn1(feat)  # (B,16,T,33)
-        feat = self.gtcn2(feat)  # (B,16,T,33)
+        feat, tcn_cache[0] = self.gtcn1(feat, tcn_cache[0])  # (B,16,T,33)
+        feat, tcn_cache[1] = self.gtcn2(feat, tcn_cache[1])  # (B,16,T,33)
 
         # streaming change
         m_feat, conv_cache[1], tra_cache[1] = self.decoder(
@@ -588,7 +571,7 @@ class StreamGTCRNMicro(nn.Module):
         spec_enh = self.mask(m, spec_ref.permute(0, 3, 2, 1))  # (B,2,T,F)
         spec_enh = spec_enh.permute(0, 3, 2, 1)  # (B,F,T,2)
 
-        return spec_enh, conv_cache, tra_cache
+        return spec_enh, conv_cache, tra_cache, tcn_cache
 
 
 if __name__ == "__main__":
@@ -634,13 +617,19 @@ if __name__ == "__main__":
     # conv_cache = torch.zeros(2, 1, 16, 16, 33).to(device)
     conv_cache = torch.zeros(2, 1, 16, 6, 33).to(device)
     tra_cache = torch.zeros(2, 3, 1, 8, 2).to(device)
+    tcn_cache = [
+        [torch.zeros(1, 16, 2 * d, 33, device=device) for d in [1, 2, 4, 8]],
+        [torch.zeros(1, 16, 2 * d, 33, device=device) for d in [1, 2, 4, 8]],
+    ]
     ys = []
     times = []
     for i in tqdm(range(x.shape[2])):
         xi = x[:, :, i : i + 1]
         tic = time.perf_counter()
         with torch.no_grad():
-            yi, conv_cache, tra_cache = stream_model(xi, conv_cache, tra_cache)
+            yi, conv_cache, tra_cache, tcn_cache = stream_model(
+                xi, conv_cache, tra_cache, tcn_cache
+            )
         toc = time.perf_counter()
         times.append((toc - tic) * 1000)
         ys.append(yi)
