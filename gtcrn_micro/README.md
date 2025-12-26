@@ -41,7 +41,7 @@
 
 | Model            | Quantization | DNSMOS-P.808  | BAK | SIG | OVRL |
 |------------------|-------------|------|--------|------|------|
-| Noisy Baseline | None     | 2.96  | 2.65    | 3.20  | 2.33  |
+| Noisy Baseline |      | 2.96  | 2.65    | 3.20  | 2.33  |
 |  RNNoise   | -     | 3.15  |  3.45   | 3.00  | 2.53  |
 | GTCRN *(Original)*    | -     | 3.44  |  3.90   | 3.00  | 2.70  |
 | GTCRN-Micro    | -      | 3.25  |  3.60   | 2.99  | 2.58  |

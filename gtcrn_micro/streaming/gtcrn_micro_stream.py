@@ -578,11 +578,11 @@ if __name__ == "__main__":
     # load non-streaming model state dict and convert to streaming
     device = torch.device("cpu")
     model = GTCRNMicro().to(device).eval()
-    # model.load_state_dict(
-    #     torch.load("./gtcrn_micro/ckpts/best_model_dns3.tar", map_location=device)[
-    #         "model"
-    #     ]
-    # )
+    model.load_state_dict(
+        torch.load("./gtcrn_micro/ckpts/best_model_dns3.tar", map_location=device)[
+            "model"
+        ]
+    )
     stream_model = StreamGTCRNMicro().to(device).eval()
     convert_to_stream(stream_model, model)
 

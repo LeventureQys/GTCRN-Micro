@@ -1,3 +1,5 @@
+# Use for converting full pytorch model to ONNX
+# Mostly used for testing the viability of PyTorch ops -> ONNX -> TFLite
 import numpy as np
 import onnx
 import soundfile as sf
@@ -78,10 +80,6 @@ def torch2onnx(
         y = model(input[None])[0]
     print("Forward works!", tuple(y.shape) if hasattr(y, "shape") else type(y), "\n")
 
-    # making a smaller input for conversion
-    # input_small = input[:, :time_chunk, :]
-    # input_small = input[:, :time_chunk, :]
-    # print(f"input small size: {input_small.shape}")
     print(f"input shape: {input.shape}")
 
     # test export from torch
@@ -127,5 +125,5 @@ if __name__ == "__main__":
         dtype="float32",
     )
 
-    # ckpt = "./gtcrn_micro/ckpts/best_model_dns3.tar"
-    torch2onnx(model, mix, model_name="gtcrn_micro", checkpoint="")
+    ckpt = "./gtcrn_micro/ckpts/best_model_dns3.tar"
+    torch2onnx(model, mix, model_name="gtcrn_micro", checkpoint=ckpt)

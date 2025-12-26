@@ -45,10 +45,10 @@ def output_test() -> None:
 
     # print state dict info
     # NOTE: not loading state-dict until new model is trained
-    # missing, unexpected = model.load_state_dict(state, strict=False)
-    # print("-" * 20)
-    # print(f"\tmissing keys: {missing}")
-    # print(f"\tunexpected keys: {unexpected}")
+    missing, unexpected = model.load_state_dict(state, strict=False)
+    print("-" * 20)
+    print(f"\tmissing keys: {missing}")
+    print(f"\tunexpected keys: {unexpected}")
 
     # explicitly setting model to eval in function
     model.eval()
