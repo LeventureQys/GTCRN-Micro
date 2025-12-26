@@ -13,6 +13,7 @@ CALIB_DATA = Path(
     "./gtcrn_micro/data/DNS3/noisy_blind_testset_v3_challenge_withSNR_16k/"
 )
 OUTPUT = Path("./gtcrn_micro/streaming/tflite/tflite_calibration.npy")
+SCALE_TXT = Path("./gtcrn_micro/streaming/tflite/calib_scale.txt")
 
 # CONSTANTS FOR STFT INFO
 N_FFT = 512
@@ -107,6 +108,10 @@ def main():
     print(f"Min/max: {x.min(), x.max()}")
     print(f"po1/p99: {np.percentile(x, 1), np.percentile(x, 99)}")
     print("**********")
+
+    # writing the scale to use in the onnx2tf conversion
+    SCALE_TXT.write_text(f"{scale}\n")
+    print(f"Wrote the scale to {SCALE_TXT}: {scale}\n")
 
 
 if __name__ == "__main__":

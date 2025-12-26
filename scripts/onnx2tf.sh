@@ -10,6 +10,14 @@ JSON_FILE=replace_gtcrn_micro.json
 CALIB_DATA="${OUTPUT_PATH}tflite_calibration.npy"
 
 # getting the scale for STD in -cind
+SCALE_FILE="${OUTPUT_PATH}calib_scale.txt"
+if [[ ! -f "SCALE_FILE" ]]; then
+	echo "Missing $SCALE_FILE" >&2
+	exit 1
+fi
+
+SCALE="$(tr -d ' \n\r\t' <"$SCALE_FILE")"
+STD=$(python -c "print(1.0/float('$SCALE'))")
 
 # firstly convert the model from PyTorch ->> ONNX
 if [ -e "$ONNX_INPUT$ONNX_FILE" ]; then
@@ -38,7 +46,7 @@ uv run onnx2tf \
 	-cotof \
 	-oiqt \
 	-qt per-channel \
-	-cind "audio" "$CALIB_DATA" "[0.5]" "[[[[0.0501392033], [0.0501392033]]]]" \
+	-cind "audio" "$CALIB_DATA" "[0.5]" "[$STD]" \
 	-rtpo PReLU \
 	-osd \
 	-b 1 \

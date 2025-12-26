@@ -92,6 +92,7 @@ def output_test() -> None:
         input_details[0]["index"], input_data1.shape, strict=True
     )
     interpreter.allocate_tensors()
+
     print(
         "in quant:",
         input_details[0]["quantization"],
