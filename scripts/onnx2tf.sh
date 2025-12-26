@@ -3,9 +3,9 @@
 set -euo pipefail
 
 # run from root
-ONNX_INPUT="gtcrn_micro/models/onnx/"
+ONNX_INPUT="gtcrn_micro/streaming/onnx/"
 ONNX_FILE=gtcrn_micro.onnx # testing lowered opset 16
-OUTPUT_PATH="gtcrn_micro/models/tflite/"
+OUTPUT_PATH="gtcrn_micro/streaming/tflite/"
 JSON_FILE=replace_gtcrn_micro.json
 CALIB_DATA="${OUTPUT_PATH}tflite_calibration.npy"
 

@@ -26,7 +26,7 @@ def torch2onnx(
         model_name (str): Name of onnx file that will be saved - "name".onnx
         checkpoint (str): Path to the model checkpoint for conversion
     """
-    ONNX_PATH = "./gtcrn_micro/models/onnx/"
+    ONNX_PATH = "./gtcrn_micro/streaming/onnx/"
 
     # loading up model checkpoints
     try:

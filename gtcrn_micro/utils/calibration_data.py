@@ -12,7 +12,7 @@ from numpy.typing import NDArray
 CALIB_DATA = Path(
     "./gtcrn_micro/data/DNS3/noisy_blind_testset_v3_challenge_withSNR_16k/"
 )
-OUTPUT = Path("./gtcrn_micro/models/tflite/tflite_calibration.npy")
+OUTPUT = Path("./gtcrn_micro/streaming/tflite/tflite_calibration.npy")
 
 # CONSTANTS FOR STFT INFO
 N_FFT = 512
