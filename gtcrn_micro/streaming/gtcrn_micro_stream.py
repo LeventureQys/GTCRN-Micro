@@ -645,9 +645,9 @@ if __name__ == "__main__":
         return_complex=False,
     )
     # enhanced_stream = enhanced_stream.squeeze(0).cpu().numpy()
-    sf.write(
-        "./gtcrn_micro/streaming/sample_wavs/enh.wav", enhanced_stream.squeeze(), 16000
-    )
+    # sf.write(
+    #     "./gtcrn_micro/streaming/sample_wavs/enh.wav", enhanced_stream.squeeze(), 16000
+    # )
     print(
         ">>> inference time: mean: {:.1f}ms, max: {:.1f}ms, min: {:.1f}ms".format(
             sum(times) / len(times), max(times), min(times)
