@@ -1,13 +1,18 @@
+# Original GTCRN author Xiaobin Rong: https://github.com/Xiaobin-Rong/gtcrn
 """
 GTCRN-Micro-Stream: MCU-focused rebuild of GTCRN, setup with streaming caching
 """
 
 import os
+import time
 
 import numpy as np
+import onnxruntime
 import soundfile as sf
 import torch
 import torch.nn as nn
+from librosa import istft
+from tqdm import tqdm
 
 from gtcrn_micro.models.gtcrn_micro import GTCRNMicro
 from gtcrn_micro.streaming.conversion.convert import convert_to_stream
@@ -681,4 +686,60 @@ if __name__ == "__main__":
             print("\nError in creating onnx file...\n")
 
         print("-" * 20)
+
     # test run of the onnx model
+    session = onnxruntime.InferenceSession(
+        onnx_file.split(".onnx")[0] + "_simple.onnx",
+        None,
+        providers=["CPUExecutionProvider"],
+    )
+    # re-init the caches
+    conv_cache = np.zeros([2, 1, 16, 6, 33], dtype="float32")
+    tra_cache = np.zeros([2, 3, 1, 8, 2], dtype="float32")
+    tcn_caches = [
+        np.zeros((1, 16, 2, 33), dtype=np.float32),
+        np.zeros((1, 16, 4, 33), dtype=np.float32),
+        np.zeros((1, 16, 8, 33), dtype=np.float32),
+        np.zeros((1, 16, 16, 33), dtype=np.float32),
+        np.zeros((1, 16, 2, 33), dtype=np.float32),
+        np.zeros((1, 16, 4, 33), dtype=np.float32),
+        np.zeros((1, 16, 8, 33), dtype=np.float32),
+        np.zeros((1, 16, 16, 33), dtype=np.float32),
+    ]
+
+    T_list = []
+    outputs = []
+
+    inputs = x.numpy()
+    start = time.perf_counter()
+    for i in tqdm(range(inputs.shape[-2])):
+        out_i, conv_cache, tra_cache, tcn_caches = session.run(
+            [],
+            {
+                "audio": inputs[..., i : i + 1, :],
+                "conv_cache": conv_cache,
+                "tra_cache": tra_cache,
+                "tcn_cache": tcn_caches,
+            },
+        )
+
+        end = time.perf_counter()
+        T_list.append(end - start)
+        outputs.append(out_i)
+
+    outputs = np.concatenate(outputs, axis=2)
+    enhanced = istft(
+        outputs[..., 0] + 1j * outputs[..., 1],
+        n_fft=512,
+        hop_length=256,
+        win_length=512,
+        window=np.hanning(512) ** 0.5,
+    )
+    sf.write("gtcrn_micro/streaming/sample/enh_onnx.wav", enhanced.squeeze(), 16000)
+
+    print("*" * 20)
+    print(f"\nONNX error: {np.abs(y - enhanced).max()}")
+    print(
+        f"\nInference time: \n\tmean: {1e3 * np.mean(T_list):.1f}ms \n\tmax: {1e3 * np.max(T_list):.1f}ms \n\tmin: {1e3 * np.min(T_list):.1f}ms"
+    )
+    print(f"\nRTF: {1e3 * np.mean(T_list) / 16}")

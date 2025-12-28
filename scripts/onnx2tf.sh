@@ -4,7 +4,7 @@ set -euo pipefail
 
 # run from root
 ONNX_INPUT="gtcrn_micro/streaming/onnx/"
-ONNX_FILE=gtcrn_micro.onnx
+ONNX_FILE=gtcrn_micro_stream_simple.onnx
 OUTPUT_PATH="gtcrn_micro/streaming/tflite/"
 JSON_FILE=replace_gtcrn_micro.json
 CALIB_DATA="${OUTPUT_PATH}tflite_calibration.npy"
@@ -61,4 +61,5 @@ uv run onnx2tf \
 	-osd \
 	-b 1 \
 	-v debug \
-	-ofgd # -kat audio conv_cache \
+	-kat audio conv_cache tra_cache tcn_cache \
+	-ofgd
