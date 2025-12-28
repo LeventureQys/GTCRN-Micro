@@ -2,13 +2,12 @@
 GTCRN-Micro-Stream: MCU-focused rebuild of GTCRN, setup with streaming caching
 """
 
-import time
+import os
 
 import numpy as np
 import soundfile as sf
 import torch
 import torch.nn as nn
-from tqdm import tqdm
 
 from gtcrn_micro.models.gtcrn_micro import GTCRNMicro
 from gtcrn_micro.streaming.conversion.convert import convert_to_stream
@@ -16,6 +15,7 @@ from gtcrn_micro.streaming.conversion.convolution import (
     StreamConv2d,
     StreamConvTranspose2d,
 )
+from gtcrn_micro.streaming.conversion.stream_onnx import stream2onnx
 
 
 class ERB(nn.Module):
@@ -613,7 +613,7 @@ if __name__ == "__main__":
 
     # --------------
     # streaming inference
-    print("\nStreaming inference")
+    # print("\nStreaming inference")
     # conv_cache = torch.zeros(2, 1, 16, 16, 33).to(device)
     conv_cache = torch.zeros(2, 1, 16, 6, 33).to(device)
     tra_cache = torch.zeros(2, 3, 1, 8, 2).to(device)
@@ -621,39 +621,64 @@ if __name__ == "__main__":
         [torch.zeros(1, 16, 2 * d, 33, device=device) for d in [1, 2, 4, 8]],
         [torch.zeros(1, 16, 2 * d, 33, device=device) for d in [1, 2, 4, 8]],
     ]
-    ys = []
-    times = []
-    for i in tqdm(range(x.shape[2])):
-        xi = x[:, :, i : i + 1]
-        tic = time.perf_counter()
-        with torch.no_grad():
-            yi, conv_cache, tra_cache, tcn_cache = stream_model(
-                xi, conv_cache, tra_cache, tcn_cache
-            )
-        toc = time.perf_counter()
-        times.append((toc - tic) * 1000)
-        ys.append(yi)
-    ys = torch.cat(ys, dim=2)
-
-    enhanced_stream = torch.view_as_complex(ys.contiguous())
-    enhanced_stream = torch.istft(
-        enhanced_stream,
-        512,
-        256,
-        512,
-        torch.hann_window(512).pow(0.5),
-        return_complex=False,
-    )
+    # ys = []
+    # times = []
+    # for i in tqdm(range(x.shape[2])):
+    #     xi = x[:, :, i : i + 1]
+    #     tic = time.perf_counter()
+    #     with torch.no_grad():
+    #         yi, conv_cache, tra_cache, tcn_cache = stream_model(
+    #             xi, conv_cache, tra_cache, tcn_cache
+    #         )
+    #     toc = time.perf_counter()
+    #     times.append((toc - tic) * 1000)
+    #     ys.append(yi)
+    # ys = torch.cat(ys, dim=2)
+    #
+    # enhanced_stream = torch.view_as_complex(ys.contiguous())
+    # enhanced_stream = torch.istft(
+    #     enhanced_stream,
+    #     512,
+    #     256,
+    #     512,
+    #     torch.hann_window(512).pow(0.5),
+    #     return_complex=False,
+    # )
     # enhanced_stream = enhanced_stream.squeeze(0).cpu().numpy()
     # sf.write(
     #     "./gtcrn_micro/streaming/sample_wavs/enh.wav", enhanced_stream.squeeze(), 16000
     # )
-    print(
-        ">>> inference time: mean: {:.1f}ms, max: {:.1f}ms, min: {:.1f}ms".format(
-            sum(times) / len(times), max(times), min(times)
-        )
-    )
-    print(">>> Streaming error, FREQ domain:", np.abs(y - ys).max())
-    print(">>> Streaming error, TIME domain:", np.abs(enhanced - enhanced_stream).max())
+    # print(
+    #     ">>> inference time: mean: {:.1f}ms, max: {:.1f}ms, min: {:.1f}ms".format(
+    #         sum(times) / len(times), max(times), min(times)
+    #     )
+    # )
+    # print(">>> Streaming error, FREQ domain:", np.abs(y - ys).max())
+    # print(">>> Streaming error, TIME domain:", np.abs(enhanced - enhanced_stream).max())
 
     # --------------
+    # ONNX conversion
+    batch_size = 1
+    frequency_bins = 257
+    time_steps = 1
+    onnx_file = "./gtcrn_micro/streaming/onnx/gtcrn_micro_stream.onnx"
+    if not os.path.exists(onnx_file):
+        print("-" * 20)
+        print("\nConverting streaming model from PyTorch -> ONNX\n")
+        input = torch.randn(batch_size, frequency_bins, time_steps, 2, device=device)
+        stream2onnx(
+            stream_model=stream_model,
+            sample_input=input,
+            conv_cache=conv_cache,
+            tra_cache=tra_cache,
+            tcn_cache=tcn_cache,
+            model_name="gtcrn_micro_stream",
+        )
+
+        if os.path.exists(onnx_file):
+            print(f"\nONNX file created at: {onnx_file}\n")
+        else:
+            print("\nError in creating onnx file...\n")
+
+        print("-" * 20)
+    # test run of the onnx model

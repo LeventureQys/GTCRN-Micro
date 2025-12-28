@@ -1,103 +1,40 @@
-# NOTE: TODO: Adjust this for streaming model and remove other torch util
-# converting streaming PyTorch Model -> ONNX
-import numpy as np
+import os
+
 import onnx
-import soundfile as sf
 import torch
 import torch.nn as nn
-from numpy.typing import NDArray
-from omegaconf import OmegaConf
-from torch import export
-
-from gtcrn_micro.models.gtcrn_micro import GTCRNMicro
+from onnxsim import simplify
 
 
 def stream2onnx(
-    model: nn.Module,
-    sample_input: NDArray[np.float64],
+    stream_model: nn.Module,
+    sample_input: torch.Tensor,
+    conv_cache: torch.Tensor,
+    tra_cache: torch.Tensor,
+    tcn_cache: list[list[torch.Tensor]],
     model_name: str,
-    checkpoint: str,
 ) -> None:
     """Convert Torch model to .onnx.
 
     Args:
-        model (nn.Module): Model to convert to onnx
-        sample_input (NDArray[np.float64]): Sample small input for conversion
+        stream_model (nn.Module): Streaming model to convert to onnx
+        sample_input (torch.Tensor): Sample small input for conversion
+        conv_cache (torch.Tensor): Convolution cache used for streaming input
+        tra_cache (torch.Tensor): TRA Lite cache used for streaming input
+        tcn_cache (list[list[torch.Tensor]]): TCN cache used for streaming input
         model_name (str): Name of onnx file that will be saved - "name".onnx
-        checkpoint (str): Path to the model checkpoint for conversion
     """
     ONNX_PATH = "./gtcrn_micro/streaming/onnx/"
 
-    # loading up model checkpoints
-    try:
-        ckpt = torch.load(
-            checkpoint,
-            map_location="cpu",
-        )
-
-        state = (
-            ckpt.get("state_dict", None)
-            or ckpt.get("model_state_dict", None)
-            or ckpt.get("model", None)
-            or ckpt
-        )
-
-        # Handling if ckpt was saved from DDP and has module prefixes
-        if any(k.startswith("module.") for k in state.keys()):
-            state = {k.removeprefix("module."): v for k, v in state.items()}
-
-        # print state dict info
-        missing, unexpected = model.load_state_dict(state, strict=False)
-        print("-" * 20)
-        print(f"\nLoaded checkpoint: {checkpoint}")
-        print(f"\tmissing keys: {missing}")
-        print(f"\tunexpected keys: {unexpected}")
-        assert not missing and not unexpected, (
-            "State dict mismatch – check model config!"
-        )
-    except Exception as e:
-        print("No checkpoint at:", checkpoint)
-        print("Exception: ", e)
-
-    # explicitly setting model to eval in function
-    model.eval()
-    model.to("cpu")
-
-    # testing that forward pass works!
-    assert fs == 16000, f"Expected fs of 16000, instead got {fs}"
-    # running stft
-    input = torch.stft(
-        torch.from_numpy(sample_input),
-        512,
-        256,
-        512,
-        torch.hann_window(512).pow(0.5),
-        return_complex=False,
-    )
-
-    # forward pass test
-    with torch.no_grad():
-        y = model(input[None])[0]
-    print("Forward works!", tuple(y.shape) if hasattr(y, "shape") else type(y), "\n")
-
-    print(f"input shape: {input.shape}")
-
-    # test export from torch
-    export.export(model, (input[None],))
-    print("torch export works...")
-
-    # -----------------------
-    # Torch -> ONNX for later -> TF -> TFLM
-
     print("starting onnx export:")
     torch.onnx.export(
-        model,
-        (input[None],),  # Exporting with small input
+        stream_model,
+        (sample_input, conv_cache, tra_cache, tcn_cache),  # Exporting with small input
         f"{ONNX_PATH}{model_name}.onnx",
         opset_version=16,  # Lowerin opset for LN
         dynamo=False,
-        input_names=["audio"],
-        output_names=["mask"],
+        input_names=["audio", "conv_cache", "tra_cache", "tcn_cache"],
+        output_names=["mask", "conv_cahe_out", "tra_cache_out", "tcn_cache_out"],
         dynamic_axes=None,
         export_params=True,
         do_constant_folding=True,
@@ -108,22 +45,34 @@ def stream2onnx(
     onnx_model = onnx.load(f"{ONNX_PATH}{model_name}.onnx")
     onnx.checker.check_model(onnx_model)
     # print ONNX input shape
-    print("Onnx input shape:\n----------")
-    for i in onnx_model.graph.input:
-        print("\n", i.type.tensor_type.shape)
+    # print("Onnx input shape:\n----------")
+    # for i in onnx_model.graph.input:
+    #     print("\n", i.type.tensor_type.shape)
+
+    # simplifying the model for onnx2tf
+    if not os.path.exists(
+        f"{ONNX_PATH}{model_name}.onnx".split(".onnx")[0] + "_simple.onnx"
+    ):
+        model_simplified, check = simplify(onnx_model)
+        assert check, "Simplified ONNX model could not be validated"
+        onnx.save(
+            model_simplified,
+            f"{ONNX_PATH}{model_name}.onnx".split(".onnx")[0] + "_simple.onnx",
+        )
 
 
-if __name__ == "__main__":
-    # loading model
-    cfg_infer = OmegaConf.load("gtcrn_micro/conf/cfg_infer.yaml")
-    cfg_network = OmegaConf.load(cfg_infer.network.config)
-    model = GTCRNMicro(**cfg_network["network_config"])
-
-    # loading test data
-    mix, fs = sf.read(
-        "./gtcrn_micro/data/DNS3/noisy_blind_testset_v3_challenge_withSNR_16k/ms_realrec_emotional_female_SNR_17.74dB_headset_A2AHXGFXPG6ZSR_Water_far_Laughter_12.wav",
-        dtype="float32",
-    )
-
-    ckpt = "./gtcrn_micro/ckpts/best_model_dns3.tar"
-    stream2onnx(model, mix, model_name="gtcrn_micro", checkpoint=ckpt)
+#
+# if __name__ == "__main__":
+#     # loading model
+#     cfg_infer = OmegaConf.load("gtcrn_micro/conf/cfg_infer.yaml")
+#     cfg_network = OmegaConf.load(cfg_infer.network.config)
+#     model = GTCRNMicro(**cfg_network["network_config"])
+#
+#     # loading test data
+#     mix, fs = sf.read(
+#         "./gtcrn_micro/data/DNS3/noisy_blind_testset_v3_challenge_withSNR_16k/ms_realrec_emotional_female_SNR_17.74dB_headset_A2AHXGFXPG6ZSR_Water_far_Laughter_12.wav",
+#         dtype="float32",
+#     )
+#
+#     ckpt = "./gtcrn_micro/ckpts/best_model_dns3.tar"
+#     stream2onnx(model, mix, model_name="gtcrn_micro", checkpoint=ckpt)
