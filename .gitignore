@@ -233,3 +233,4 @@ gtcrn_micro/streaming/onnx/test*
 gtcrn_micro/models/onnx/
 gtcrn_micro/models/tflite
 gtcrn_micro/streaming/
+*.npy
