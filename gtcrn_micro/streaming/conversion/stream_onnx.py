@@ -26,6 +26,10 @@ def stream2onnx(
     """
     ONNX_PATH = "./gtcrn_micro/streaming/onnx/"
 
+    # creating all of the TCN caches:
+    tcn_in_names = [f"tcn_cache_{k}" for k in range(len(tcn_cache[0]) * 2)]
+    tcn_out_names = [f"tcn_cache_out_{k}" for k in range(len(tcn_cache[0]) * 2)]
+
     print("starting onnx export:")
     torch.onnx.export(
         stream_model,
@@ -33,8 +37,8 @@ def stream2onnx(
         f"{ONNX_PATH}{model_name}.onnx",
         opset_version=16,  # Lowerin opset for LN
         dynamo=False,
-        input_names=["audio", "conv_cache", "tra_cache", "tcn_cache"],
-        output_names=["mask", "conv_cahe_out", "tra_cache_out", "tcn_cache_out"],
+        input_names=["audio", "conv_cache", "tra_cache", *tcn_in_names],
+        output_names=["mask", "conv_cahe_out", "tra_cache_out", *tcn_out_names],
         dynamic_axes=None,
         export_params=True,
         do_constant_folding=True,

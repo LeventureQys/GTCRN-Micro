@@ -595,7 +595,7 @@ if __name__ == "__main__":
     print("\nOffline inference")
     x = torch.from_numpy(
         sf.read(
-            "./gtcrn_micro/data/DNS3/noisy_blind_testset_v3_challenge_withSNR_16k/ms_realrec_emotional_female_SNR_17.74dB_headset_A2AHXGFXPG6ZSR_Water_far_Laughter_12.wav",
+            "./gtcrn_micro/data/DNS3/noisy_blind_testset_v3_challenge_withSNR_16k/ms_realrec_nonenglish_female_SNR_23.01dB_headset_10_spanish_1.wav",
             dtype="float32",
         )[0]
     )
@@ -666,6 +666,7 @@ if __name__ == "__main__":
     batch_size = 1
     frequency_bins = 257
     time_steps = 1
+
     onnx_file = "./gtcrn_micro/streaming/onnx/gtcrn_micro_stream.onnx"
     if not os.path.exists(onnx_file):
         print("-" * 20)
@@ -709,21 +710,36 @@ if __name__ == "__main__":
 
     T_list = []
     outputs = []
+    print("\nChecking inputs:\n")
+    sess_inputs = session.get_inputs()
+    for j, inp in enumerate(sess_inputs):
+        print(j, inp.name, inp.shape, inp.type)
+
+    print("\nRunning ONNX inference...\n")
 
     inputs = x.numpy()
-    start = time.perf_counter()
     for i in tqdm(range(inputs.shape[-2])):
-        out_i, conv_cache, tra_cache, tcn_caches = session.run(
-            [],
+        start = time.perf_counter()
+        output_onnx = session.run(
+            None,
             {
                 "audio": inputs[..., i : i + 1, :],
                 "conv_cache": conv_cache,
                 "tra_cache": tra_cache,
-                "tcn_cache": tcn_caches,
+                **{f"tcn_cache_{k}": tcn_caches[k] for k in range(8)},
             },
         )
+        # debugging outputs
+        # for m, outp in enumerate(session.get_outputs()):
+        #     print(m, outp.name, outp.shape, outp.type)
 
         end = time.perf_counter()
+        # need to unpack the onnx outputs
+        out_i = output_onnx[0]
+        conv_cache = output_onnx[1]
+        tra_cache = output_onnx[2]
+        tcn_caches = output_onnx[3:]
+
         T_list.append(end - start)
         outputs.append(out_i)
 
@@ -738,7 +754,7 @@ if __name__ == "__main__":
     sf.write("gtcrn_micro/streaming/sample/enh_onnx.wav", enhanced.squeeze(), 16000)
 
     print("*" * 20)
-    print(f"\nONNX error: {np.abs(y - enhanced).max()}")
+    print(f"\nONNX error: {np.abs(y - outputs).max()}")
     print(
         f"\nInference time: \n\tmean: {1e3 * np.mean(T_list):.1f}ms \n\tmax: {1e3 * np.max(T_list):.1f}ms \n\tmin: {1e3 * np.min(T_list):.1f}ms"
     )

@@ -235,4 +235,4 @@ gtcrn_micro/streaming/tflite/variables
 gtcrn_micro/models/onnx/
 gtcrn_micro/models/tflite
 *.npy
-gtcrn_micro/streaming/tflite/*.txt
+gtcrn_micro/streaming/tflite/calib_scale.txt
