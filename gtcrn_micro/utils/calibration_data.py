@@ -1,20 +1,13 @@
 # used for onnx2tf.sh
-# ----------------
-from __future__ import print_function
-
 import os
 from pathlib import Path
 
 import numpy as np
+import onnxruntime
 import soundfile as sf
 import torch
-import torch.nn as nn
 from numpy.typing import NDArray
 from tqdm import tqdm
-
-from gtcrn_micro.models.gtcrn_micro import GTCRNMicro
-from gtcrn_micro.streaming.conversion.convert import convert_to_stream
-from gtcrn_micro.streaming.gtcrn_micro_stream import StreamGTCRNMicro
 
 # CONSTANTS FOR STFT INFO
 N_FFT = 512
@@ -47,9 +40,9 @@ def wav_2_tensor(wav_path: Path) -> torch.Tensor:
         torch.hann_window(N_FFT).pow(0.5),
         return_complex=False,
     )[None]
-    print("-" * 20)
-    print("STFT Streaming Shape:\n")
-    print(stft.shape)
+    # print("-" * 20)
+    # print("STFT Streaming Shape:\n")
+    # print(stft.shape)
 
     # specifically for the tf model conversion we need to transpose the inputs
     # stft_np = stft.numpy().transpose(1, 2, 0)
@@ -108,15 +101,25 @@ def scale_write(data: NDArray[np.float32], output_path: Path, file_name: str):
 
 
 def gen_calib_data(
-    stream_model: nn.Module,
+    onnx_file: str,
     warmup: int,
-    n_samples: int,
+    n_wavs: int,
+    n_frames: int,
     calib_data: Path,
     output_path: Path,
 ):
     """Generate calibration data set by input wav."""
+    # ONNX Setup
+    onnx_file = "./gtcrn_micro/streaming/onnx/gtcrn_micro_stream.onnx"
+    session = onnxruntime.InferenceSession(
+        onnx_file.split(".onnx")[0] + "_simple.onnx",
+        None,
+        providers=["CPUExecutionProvider"],
+    )
+    print("\nRunning ONNX inference...\n")
+
     # getting .wav files in directory
-    wavs = sorted(calib_data.glob("*.wav"))[:n_samples]
+    wavs = sorted(calib_data.glob("*.wav"))[:n_wavs]
 
     # initializing all input data
     audio_samples = []
@@ -124,46 +127,59 @@ def gen_calib_data(
     tra_samples = []
     tcn_samples = [[] for _ in range(8)]
     for i in wavs:
-        # initializing the caches:
-        conv_cache = torch.zeros(2, 1, 16, 6, 33)
-        tra_cache = torch.zeros(2, 3, 1, 8, 2)
+        # ONNX
+        conv_cache = np.zeros([2, 1, 16, 6, 33], dtype="float32")
+        tra_cache = np.zeros([2, 3, 1, 8, 2], dtype="float32")
         tcn_cache = [
-            [torch.zeros(1, 16, 2 * d, 33) for d in [1, 2, 4, 8]],
-            [torch.zeros(1, 16, 2 * d, 33) for d in [1, 2, 4, 8]],
+            np.zeros((1, 16, 2, 33), dtype=np.float32),
+            np.zeros((1, 16, 4, 33), dtype=np.float32),
+            np.zeros((1, 16, 8, 33), dtype=np.float32),
+            np.zeros((1, 16, 16, 33), dtype=np.float32),
+            np.zeros((1, 16, 2, 33), dtype=np.float32),
+            np.zeros((1, 16, 4, 33), dtype=np.float32),
+            np.zeros((1, 16, 8, 33), dtype=np.float32),
+            np.zeros((1, 16, 16, 33), dtype=np.float32),
         ]
 
         # appending the tensor stft to data list
         stft_np = wav_2_tensor(i)
+        stft_np = stft_np.numpy()
 
         # iterating through each time frame
         for frame in tqdm(range(stft_np.shape[2])):
-            # permuted: (T, F, 2)
-            # audio_frame = stft_np[frame : frame + 1, :, :]
             audio_frame = stft_np[:, :, frame : frame + 1]
-            # for frame in range(max_frames):
-            #     # increment and get current frame
-            #     audio_frame = stft_np[frame : frame + 1, :, :]
-            # print("\nAudio frame: ", audio_frame)
-            # print("\nAudio shape: ", audio_frame.shape)
+
+            # running inference to get cache info with onnx for speed
+            output_onnx = session.run(
+                None,
+                {
+                    "audio": audio_frame,
+                    "conv_cache": conv_cache,
+                    "tra_cache": tra_cache,
+                    **{f"tcn_cache_{k}": tcn_cache[k] for k in range(8)},
+                },
+            )
+            # need to unpack the onnx outputs
+            # out_i = output_onnx[0]
+            conv_cache = output_onnx[1]
+            tra_cache = output_onnx[2]
+            tcn_cache = output_onnx[3:]
 
             # only generate until n_samples
-            if frame >= warmup and len(audio_samples) < n_samples:
-                audio_samples.append(audio_frame.numpy())
-                conv_samples.append(conv_cache.numpy())
-                tra_samples.append(tra_cache.numpy())
-                # flattening both the two GTCN blocks to iter
-                full_tcn = tcn_cache[0] + tcn_cache[1]
-
+            if frame >= warmup and len(audio_samples) < n_frames:
+                audio_samples.append(audio_frame)
+                conv_samples.append(conv_cache)
+                tra_samples.append(tra_cache)
                 for k in range(8):
                     # need to transpose for TF (B, C, kT, F) -> (B, kT, F, C)
-                    tcn_samples[k].append(full_tcn[k].permute(0, 2, 3, 1).numpy())
+                    tcn_samples[k].append(tcn_cache[k].transpose(0, 2, 3, 1))
 
-            with torch.no_grad():
-                y, conv_cache, tra_cache, tcn_cache = stream_model(
-                    audio_frame, conv_cache, tra_cache, tcn_cache
-                )
+            if len(audio_samples) > n_frames:
+                break
 
-    # NOTE: CHECK SHAPES
+        if len(audio_samples) > n_frames:
+            break
+
     # stacking and saving the data to write
     audio_data = np.concatenate(audio_samples, axis=0).astype(np.float32)
     scale_write(data=audio_data, output_path=output_path, file_name="audio")
@@ -186,22 +202,16 @@ if __name__ == "__main__":
     )
     ouput_path = Path("./gtcrn_micro/streaming/tflite/calibration_data/")
     warmup = 63
-    # max_frames = 973
-    n = 30
-    # convert model to streaming
-    device = torch.device("cpu")
-    model = GTCRNMicro().to(device).eval()
-    model.load_state_dict(
-        torch.load("./gtcrn_micro/ckpts/best_model_dns3.tar", map_location=device)[
-            "model"
-        ]
-    )
-    stream_model = StreamGTCRNMicro().to(device).eval()
-    convert_to_stream(stream_model, model)
+    n_wavs = 50
+    n_frames = 10000
+    # loading streaming onnx file
+    onnx_file = "./gtcrn_micro/streaming/onnx/gtcrn_micro_stream.onnx"
+
     gen_calib_data(
-        stream_model=stream_model,
+        onnx_file=onnx_file,
         warmup=warmup,
-        n_samples=n,
+        n_wavs=n_wavs,
+        n_frames=n_frames,
         calib_data=calib_data,
         output_path=ouput_path,
     )
