@@ -73,7 +73,7 @@ def scale_write(data: NDArray[np.float32], output_path: Path, file_name: str):
 
     # clipping data for quantization
     a = np.percentile(np.abs(data), 99.99)
-    scale = 2.0 * a * 1.06
+    scale = 2.0 * a * 1.10
     # scale_low = np.percentile(data, 0.1)
     # scale_high = np.percentile(data, 99.9)
     # scale = max(abs(scale_low), abs(scale_high)) * 2.0
@@ -110,7 +110,7 @@ def gen_calib_data(
 ):
     """Generate calibration data set by input wav."""
     # ONNX Setup
-    onnx_file = "./gtcrn_micro/streaming/onnx/gtcrn_micro_stream.onnx"
+    onnx_file = onnx_file
     session = onnxruntime.InferenceSession(
         onnx_file.split(".onnx")[0] + "_simple.onnx",
         None,
@@ -149,6 +149,15 @@ def gen_calib_data(
         for frame in tqdm(range(stft_np.shape[2])):
             audio_frame = stft_np[:, :, frame : frame + 1]
 
+            # only generate until n_samples
+            if frame >= warmup and len(audio_samples) < n_frames:
+                audio_samples.append(audio_frame)
+                conv_samples.append(conv_cache)
+                tra_samples.append(tra_cache)
+                for k in range(8):
+                    # need to transpose for TF (B, C, kT, F) -> (B, kT, F, C)
+                    tcn_samples[k].append(tcn_cache[k].transpose(0, 2, 3, 1))
+
             # running inference to get cache info with onnx for speed
             output_onnx = session.run(
                 None,
@@ -165,27 +174,18 @@ def gen_calib_data(
             tra_cache = output_onnx[2]
             tcn_cache = output_onnx[3:]
 
-            # only generate until n_samples
-            if frame >= warmup and len(audio_samples) < n_frames:
-                audio_samples.append(audio_frame)
-                conv_samples.append(conv_cache)
-                tra_samples.append(tra_cache)
-                for k in range(8):
-                    # need to transpose for TF (B, C, kT, F) -> (B, kT, F, C)
-                    tcn_samples[k].append(tcn_cache[k].transpose(0, 2, 3, 1))
-
-            if len(audio_samples) > n_frames:
+            if len(audio_samples) >= n_frames:
                 break
 
-        if len(audio_samples) > n_frames:
+        if len(audio_samples) >= n_frames:
             break
 
     # stacking and saving the data to write
     audio_data = np.concatenate(audio_samples, axis=0).astype(np.float32)
     scale_write(data=audio_data, output_path=output_path, file_name="audio")
-    conv_data = np.concatenate(conv_samples, axis=0).astype(np.float32)
+    conv_data = np.stack(conv_samples, axis=0).astype(np.float32)
     scale_write(data=conv_data, output_path=output_path, file_name="conv_cache")
-    tra_data = np.concatenate(tra_samples, axis=0).astype(np.float32)
+    tra_data = np.stack(tra_samples, axis=0).astype(np.float32)
     scale_write(data=tra_data, output_path=output_path, file_name="tra_cache")
     for c in range(8):
         scale_write(
