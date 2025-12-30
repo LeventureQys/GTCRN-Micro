@@ -48,7 +48,7 @@ def wav_2_tensor(wav_path: Path) -> torch.Tensor:
         return_complex=False,
     )[None]
     print("-" * 20)
-    print("\nTESTTESS")
+    print("STFT Streaming Shape:\n")
     print(stft.shape)
 
     # specifically for the tf model conversion we need to transpose the inputs
@@ -110,7 +110,6 @@ def scale_write(data: NDArray[np.float32], output_path: Path, file_name: str):
 def gen_calib_data(
     stream_model: nn.Module,
     warmup: int,
-    max_frames: int,
     n_samples: int,
     calib_data: Path,
     output_path: Path,
@@ -186,9 +185,9 @@ if __name__ == "__main__":
         "./gtcrn_micro/data/DNS3/noisy_blind_testset_v3_challenge_withSNR_16k/"
     )
     ouput_path = Path("./gtcrn_micro/streaming/tflite/calibration_data/")
-    warmup = 1
-    max_frames = 973
-    n = 2
+    warmup = 63
+    # max_frames = 973
+    n = 30
     # convert model to streaming
     device = torch.device("cpu")
     model = GTCRNMicro().to(device).eval()
@@ -202,7 +201,6 @@ if __name__ == "__main__":
     gen_calib_data(
         stream_model=stream_model,
         warmup=warmup,
-        max_frames=max_frames,
         n_samples=n,
         calib_data=calib_data,
         output_path=ouput_path,
