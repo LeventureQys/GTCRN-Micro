@@ -230,9 +230,8 @@ gtcrn_micro/streaming/onnx/*.sh
 gtcrn_micro/streaming/onnx/test*
 gtcrn_micro/streaming/tflite/*.tflite
 gtcrn_micro/streaming/tflite/variables
-# temporarily not tracking
+gtcrn_micro/streaming/tflite/calibration_data/
 
 gtcrn_micro/models/onnx/
 gtcrn_micro/models/tflite
 *.npy
-gtcrn_micro/streaming/tflite/calib_scale.txt

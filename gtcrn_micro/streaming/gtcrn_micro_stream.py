@@ -544,9 +544,11 @@ class StreamGTCRNMicro(nn.Module):
         self.mask = Mask()
 
     def forward(self, spec, conv_cache, tra_cache, tcn_cache):
-        """
-        spec: (B, F, T, 2)
+        """Streaming forward pass.
+        spec: (B, F, T, C)
         conv_cache: [en_cache, de_cache], (2, B, C, 8(kT-1), F) = (2, 1, 16, 16, 33)
+        tra_cache: [en_cache, de_cache], (2, 3, 1, 8, 2)
+        tcn_cache: [en_cache, de_cache],(2, B, C, 2*d, F) = (2, 2, 16, 2*d, 33)
         """
         spec_ref = spec  # (B,F,T,2)
 
@@ -619,7 +621,6 @@ if __name__ == "__main__":
     # --------------
     # streaming inference
     # print("\nStreaming inference")
-    # conv_cache = torch.zeros(2, 1, 16, 16, 33).to(device)
     conv_cache = torch.zeros(2, 1, 16, 6, 33).to(device)
     tra_cache = torch.zeros(2, 3, 1, 8, 2).to(device)
     tcn_cache = [
