@@ -6,30 +6,24 @@ set -euo pipefail
 ONNX_INPUT="gtcrn_micro/streaming/onnx/"
 ONNX_FILE=gtcrn_micro_stream_simple.onnx
 OUTPUT_PATH="gtcrn_micro/streaming/tflite/"
+CALIB_PATH="gtcrn_micro/streaming/tflite/calibration_data/"
 JSON_FILE=replace_gtcrn_micro.json
-CALIB_DATA="${OUTPUT_PATH}tflite_calibration.npy"
 
-# getting the scale for STD in -cind
-SCALE_FILE="${OUTPUT_PATH}calib_scale.txt"
-if [[ ! -f "$SCALE_FILE" ]]; then
-	echo "Missing $SCALE_FILE" >&2
+# functions to help organize the file
+die() {
+	echo "ERROR: $*" >&2
 	exit 1
-fi
-
-SCALE="$(tr -d ' \n\r\t' <"$SCALE_FILE")"
-STD=$(python -c "print(1.0/float('$SCALE'))")
-
-echo "SCALE=$SCALE"
-echo "STD=$STD"
-python - <<PY
-import numpy as np
-x = np.load("${CALIB_DATA}")
-print("calib shape:", x.shape, "dtype:", x.dtype)
-print("calib min/max:", float(x.min()), float(x.max()))
-print("calib p0.1/p99.9:", float(np.percentile(x,0.1)), float(np.percentile(x,99.9)))
+}
+need_file() { [[ -f "$1" ]] || die "Missing file: $1"; }
+trim() { tr -d ' \n\r\t'; }
+inv_scale() {
+	python - <<PY
+scale = float("$1")
+print(1.0/scale)
 PY
+}
 
-# firstly convert the model from PyTorch ->> ONNX
+# convert the model from PyTorch ->> ONNX
 if [ -e "$ONNX_INPUT$ONNX_FILE" ]; then
 	echo "$ONNX_INPUT$ONNX_FILE exists..."
 else
@@ -38,28 +32,108 @@ else
 	uv run -m gtcrn_micro.streaming.conversion.stream_onnx
 	echo "$ONNX_FILE created in $ONNX_INPUT"
 fi
+# check that it exists now:
+need_file "$ONNX_INPUT$ONNX_FILE"
 
-# double check file exists
-if [ -e "$CALIB_DATA" ]; then
-	echo "$CALIB_DATA exists."
+# check for json file
+if [[ -f "$OUTPUT_PATH$JSON_FILE" ]]; then
+	echo "Json file $JSON_FILE exists..."
 else
-	echo "$CALIB_DATA does not exist"
+	echo "Json file for replacement doesn't exist"
 fi
 
-# run onnx conversion
-uv run onnx2tf \
-	\
-	-i "${ONNX_INPUT}${ONNX_FILE}" \
-	-o "${OUTPUT_PATH}" \
-	\
-	-prf ${OUTPUT_PATH}${JSON_FILE} \
-	-cotof \
-	-oiqt \
-	-qt per-channel \
-	-cind "audio" "$CALIB_DATA" "[[[[0.5], [0.5]]]]" "[[[[$STD], [$STD]]]]" \
-	-rtpo PReLU \
-	-osd \
-	-b 1 \
-	-v debug \
-	-kat audio conv_cache tra_cache tcn_cache \
+# checking if calibration directory exists
+if [[ ! -d "${CALIB_PATH}" ]]; then
+	echo "Missing calibration data..."
+	uv run -m gtcrn_micro.utils.calibration_data
+fi
+# double check the directory exists now
+[[ -d "${CALIB_PATH}" ]] || die "Calibration directory missing: ${CALIB_PATH}"
+
+# getting the names of required inputs
+INPUTS=(audio conv_cache tra_cache)
+for k in {0..7}; do INPUTS+=("tcn_cache_${k}"); done
+
+AUDIO_MEAN="[[[[0.5, 0.5]]]]"
+AUDIO_STD="[[[[%s, %s]]]]"
+# AUDIO_MEAN="[0.5]"
+# AUDIO_STD="[%s]"
+
+CACHE_MEAN="[0.5]"
+CACHE_STD="[%s]"
+
+# getting the non-variable args:
+args=(
+	-i "${ONNX_INPUT}${ONNX_FILE}"
+	-o "${OUTPUT_PATH}"
+	-prf ${OUTPUT_PATH}${JSON_FILE}
+	-cotof
+	-oiqt
+	-qt per-channel
+	-rtpo PReLU
+	-osd
+	-b 1
+	-v debug
 	-ofgd
+)
+
+# -kat list
+args+=(-kat "${INPUTS[@]}")
+# args+=(-kt "${INPUTS[@]}")
+
+# making the -cind list with the std calc
+for file in "${INPUTS[@]}"; do
+
+	# name the file
+	npy="${CALIB_PATH}${file}.npy"
+	txt="${CALIB_PATH}${file}.txt"
+
+	# check the file exists
+	need_file "$npy"
+	need_file "$txt"
+
+	printf '\nNPY File: %s\n' "$npy"
+	printf 'TXT File: %s\n' "$txt"
+
+	# getting the scale for STD
+	scale="$(trim <"$txt")"
+	[[ -n "$scale" ]] || die "Empty scale in $txt"
+	std="$(inv_scale "$scale")"
+	# printf 'STD: %f\n' "$std"
+
+	if [[ "$file" == "audio" ]]; then
+		mean="$AUDIO_MEAN"
+		cind_std="$(printf "$AUDIO_STD" "$std" "$std")"
+	else
+		mean="$CACHE_MEAN"
+		cind_std="$(printf "$CACHE_STD" "$std")"
+	fi
+
+	echo "Using $file: scale=$scale std=$std npy=$npy"
+	args+=(-cind "$file" "$npy" "$mean" "$cind_std")
+
+done
+
+# old non-streaming variant
+# uv run onnx2tf \
+# 	\
+# 	-i "${ONNX_INPUT}${ONNX_FILE}" \
+# 	-o "${OUTPUT_PATH}" \
+# 	\
+# 	-prf ${OUTPUT_PATH}${JSON_FILE} \
+# 	-cotof \
+# 	-oiqt \
+# 	-qt per-channel \
+# 	-cind "audio" "$CALIB_DATA" "[[[[$STD], [$STD]]]]" \
+# 	-rtpo PReLU \
+# 	-osd \
+# 	-b 1 \
+# 	-v debug \
+# 	-kat audio conv_cache tra_cache tcn_cache \
+# 	-ofgd
+
+# run onnx conversion
+echo "Running ONNX -> TF..."
+uv run onnx2tf "${args[@]}"
+# uv run onnx2tf -h | sed -n '1600,1680p'
+# uv run onnx2tf -h | grep -E "\-kat|\-k |\ -kt "

@@ -156,7 +156,8 @@ def gen_calib_data(
                 tra_samples.append(tra_cache)
                 for k in range(8):
                     # need to transpose for TF (B, C, kT, F) -> (B, kT, F, C)
-                    tcn_samples[k].append(tcn_cache[k].transpose(0, 2, 3, 1))
+                    # tcn_samples[k].append(tcn_cache[k].transpose(0, 2, 3, 1))
+                    tcn_samples[k].append(tcn_cache[k])
 
             # running inference to get cache info with onnx for speed
             output_onnx = session.run(
@@ -181,7 +182,7 @@ def gen_calib_data(
             break
 
     # stacking and saving the data to write
-    audio_data = np.concatenate(audio_samples, axis=0).astype(np.float32)
+    audio_data = np.stack(audio_samples, axis=0).astype(np.float32)
     scale_write(data=audio_data, output_path=output_path, file_name="audio")
     conv_data = np.stack(conv_samples, axis=0).astype(np.float32)
     scale_write(data=conv_data, output_path=output_path, file_name="conv_cache")
@@ -189,7 +190,7 @@ def gen_calib_data(
     scale_write(data=tra_data, output_path=output_path, file_name="tra_cache")
     for c in range(8):
         scale_write(
-            data=np.concatenate(tcn_samples[c], axis=0).astype(np.float32),
+            data=np.stack(tcn_samples[c], axis=0).astype(np.float32),
             output_path=output_path,
             file_name=f"tcn_cache_{c}",
         )
