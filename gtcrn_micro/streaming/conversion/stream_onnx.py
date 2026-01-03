@@ -38,7 +38,7 @@ def stream2onnx(
         opset_version=16,  # Lowerin opset for LN
         dynamo=False,
         input_names=["audio", "conv_cache", "tra_cache", *tcn_in_names],
-        output_names=["mask", "conv_cahe_out", "tra_cache_out", *tcn_out_names],
+        output_names=["mask", "conv_cache_out", "tra_cache_out", *tcn_out_names],
         dynamic_axes=None,
         export_params=True,
         do_constant_folding=True,
