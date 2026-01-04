@@ -418,22 +418,39 @@ class StreamEncoder(nn.Module):
 
         # streaming forward pass for Streaming blocks
         # NOTE: due to dilation quant restrictions, need to make smaller dilation caches
-        x, conv_cache[:, :, :2, :], tra_cache[0] = self.en_convs[2](
-            x, conv_cache[:, :, :2, :], tra_cache[0]
-        )
+        # x, conv_cache[:, :, :2, :], tra_cache[0] = self.en_convs[2](
+        #     x, conv_cache[:, :, :2, :], tra_cache[0]
+        # )
+        # en_outs.append(x)
+        #
+        # x, conv_cache[:, :, 2:4, :], tra_cache[1] = self.en_convs[3](
+        #     x, conv_cache[:, :, 2:4, :], tra_cache[1]
+        # )
+        # en_outs.append(x)
+        #
+        # x, conv_cache[:, :, 4:6, :], tra_cache[2] = self.en_convs[4](
+        #     x, conv_cache[:, :, 4:6, :], tra_cache[2]
+        # )
+        # en_outs.append(x)
+
+        # NOTE: To fix with exporting and quantization to int8 issues
+        # conv cache
+        c0, c1, c2 = torch.split(conv_cache, 2, dim=2)
+
+        # tra cache
+        t0, t1, t2 = torch.unbind(tra_cache, dim=0)
+
+        x, c0_out, t0_out = self.en_convs[2](x, c0, t0)
+        en_outs.append(x)
+        x, c1_out, t1_out = self.en_convs[3](x, c1, t1)
+        en_outs.append(x)
+        x, c2_out, t2_out = self.en_convs[4](x, c2, t2)
         en_outs.append(x)
 
-        x, conv_cache[:, :, 2:4, :], tra_cache[1] = self.en_convs[3](
-            x, conv_cache[:, :, 2:4, :], tra_cache[1]
-        )
-        en_outs.append(x)
+        conv_cache_out = torch.cat([c0_out, c1_out, c2_out], dim=2)
+        tra_cache_out = torch.stack([t0_out, t1_out, t2_out], dim=0)
 
-        x, conv_cache[:, :, 4:6, :], tra_cache[2] = self.en_convs[4](
-            x, conv_cache[:, :, 4:6, :], tra_cache[2]
-        )
-        en_outs.append(x)
-
-        return x, en_outs, conv_cache, tra_cache
+        return x, en_outs, conv_cache_out, tra_cache_out
 
 
 class StreamDecoder(nn.Module):
@@ -492,22 +509,35 @@ class StreamDecoder(nn.Module):
 
     def forward(self, x, en_outs, conv_cache, tra_cache):
         # decoding the cache backwards
-        x, conv_cache[:, :, 4:6, :], tra_cache[0] = self.de_convs[0](
-            x + en_outs[4], conv_cache[:, :, 4:6, :], tra_cache[0]
-        )
+        # x, conv_cache[:, :, 4:6, :], tra_cache[0] = self.de_convs[0](
+        #     x + en_outs[4], conv_cache[:, :, 4:6, :], tra_cache[0]
+        # )
+        #
+        # x, conv_cache[:, :, 2:4, :], tra_cache[1] = self.de_convs[1](
+        #     x + en_outs[3], conv_cache[:, :, 2:4, :], tra_cache[1]
+        # )
+        #
+        # x, conv_cache[:, :, :2, :], tra_cache[2] = self.de_convs[2](
+        #     x + en_outs[2], conv_cache[:, :, :2, :], tra_cache[2]
+        # )
+        #
+        # NOTE: To fix with exporting and quantization to int8 issues
+        # conv cache
+        c0, c1, c2 = torch.split(conv_cache, [2, 2, 2], dim=2)
 
-        x, conv_cache[:, :, 2:4, :], tra_cache[1] = self.de_convs[1](
-            x + en_outs[3], conv_cache[:, :, 2:4, :], tra_cache[1]
-        )
+        # tra cache
+        t0, t1, t2 = torch.unbind(tra_cache, dim=0)
 
-        x, conv_cache[:, :, :2, :], tra_cache[2] = self.de_convs[2](
-            x + en_outs[2], conv_cache[:, :, :2, :], tra_cache[2]
-        )
+        x, c2_out, t0_out = self.de_convs[0](x + en_outs[4], c2, t0)
+        x, c1_out, t1_out = self.de_convs[1](x + en_outs[3], c1, t1)
+        x, c0_out, t2_out = self.de_convs[2](x + en_outs[2], c0, t2)
 
+        conv_cache_out = torch.cat([c0_out, c1_out, c2_out], dim=2)
+        tra_cache_out = torch.stack([t0_out, t1_out, t2_out], dim=0)
         # iter as normal through last two conv blocks
         for i in range(3, 5):
             x = self.de_convs[i](x + en_outs[4 - i])
-        return x, conv_cache, tra_cache
+        return x, conv_cache_out, tra_cache_out
 
 
 class Mask(nn.Module):

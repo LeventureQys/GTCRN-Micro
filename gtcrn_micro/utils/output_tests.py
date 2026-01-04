@@ -71,6 +71,9 @@ def output_test() -> None:
     ys = torch.cat(ys, dim=2)
 
     enhanced_stream = torch.view_as_complex(ys.contiguous())
+    # for f-domain comparison
+    p_stft = ys.squeeze(0).cpu().numpy()
+
     enhanced_stream = torch.istft(
         enhanced_stream,
         512,
@@ -80,6 +83,11 @@ def output_test() -> None:
         return_complex=False,
     )
     enhanced_pytorch = enhanced_stream.squeeze(0).cpu().numpy()
+    sf.write(
+        "gtcrn_micro/streaming/sample/enh_torch_test2.wav",
+        enhanced_pytorch,
+        16000,
+    )
 
     onnx_file = "./gtcrn_micro/streaming/onnx/gtcrn_micro_stream.onnx"
     session = onnxruntime.InferenceSession(
@@ -125,12 +133,18 @@ def output_test() -> None:
         outputs.append(out_i)
 
     outputs = np.concatenate(outputs, axis=2)
+    o_stft = outputs
     enhanced_onnx = istft(
         outputs[..., 0] + 1j * outputs[..., 1],
         n_fft=512,
         hop_length=256,
         win_length=512,
         window=np.hanning(512) ** 0.5,
+    )
+    sf.write(
+        "gtcrn_micro/streaming/sample/enh_onnx_test2.wav",
+        enhanced_onnx.squeeze(),
+        16000,
     )
 
     # TFLite
@@ -139,11 +153,13 @@ def output_test() -> None:
     # tflite_path = (
     #     "gtcrn_micro/streaming/tflite/gtcrn_micro_stream_simple_float32.tflite"
     # )
+    # tflite_path = "gtcrn_micro/streaming/tflite/gtcrn_micro_stream_simple_dynamic_range_quant.tflite"
     tflite_path = (
         "gtcrn_micro/streaming/tflite/gtcrn_micro_stream_simple_float16.tflite"
     )
     # tflite_path = "./gtcrn_micro/streaming/tflite/gtcrn_micro_stream_simple_int8.tflite"
     tflite_stft = tflite_stream_infer(x, model_path=tflite_path)
+    t_stft = tflite_stft
     enhanced_tflite = istft(
         tflite_stft[..., 0] + 1j * tflite_stft[..., 1],
         n_fft=512,
@@ -151,12 +167,23 @@ def output_test() -> None:
         win_length=512,
         window=np.hanning(512) ** 0.5,
     )
+    sf.write(
+        "gtcrn_micro/streaming/sample/enh_tflite_f16.wav",
+        enhanced_tflite.squeeze(),
+        16000,
+    )
 
     print("\n-------------")
 
     print("\nTFLite output done\n")
     print("*" * 10)
     print("\nOUTPUT STATS\n")
+    print("\nF-Domain:\n")
+    print(f"STFT MAE ONNX vs PT: {np.mean(np.abs(o_stft - p_stft))}")
+    print(f"STFT MAE TFL vs PT: {np.mean(np.abs(t_stft - p_stft))}")
+    print(f"STFT MAE TFL vs ONNX: {np.mean(np.abs(t_stft - o_stft))}")
+    m = np.mean(np.abs(t_stft - p_stft), axis=(0, 1, 3))
+    print(f"TFL vs PT frame MAE start - mid - end: {m[0]} - {m[len(m) // 2]} - {m[-1]}")
 
     print(
         f"Onnx outputs error vs pytorch: {np.mean(np.abs(enhanced_onnx - enhanced_pytorch))}"

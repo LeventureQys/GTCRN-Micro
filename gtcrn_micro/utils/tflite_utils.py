@@ -19,11 +19,18 @@ def _pick(details: dict[str, Any], key: str, default_idx: int = None):
 
     Returns:
         Index
+
+    Raises:
+        KeyError: Unable to find key
     """
     key = key.lower()
     for d in details:
         if key in d["name"].lower():
             return d
+
+    if default_idx is None:
+        raise KeyError(f"Couldnt find tensor conatining: {key}")
+    return details[default_idx]
 
 
 def _get_qparams(detail: dict[str, Any]):
@@ -245,6 +252,89 @@ def _tcn_cache_out_read(cache_out: npt.NDArray, in_shape: npt.NDArray) -> npt.ND
     raise ValueError(f"TCN cache shape issue: out={cache_out.shape} - in={in_shape}")
 
 
+def _to_tcn_layout(tcn_cache_raw: npt.NDArray) -> npt.NDArray:
+    """Convert TCN cache output to the cache input layout: (1, 16, T, 33)
+
+    Args:
+        tcn_cache_raw (npt.NDArray): Raw output caches
+
+    Returns:
+        (npt.NDArray): Correct ordered cache
+
+    Raises:
+        ValueError: Wrong cache layout
+    """
+    if tcn_cache_raw.ndim != 4:
+        raise ValueError(f"Expected 4d TCN cache, got {tcn_cache_raw.shape}")
+
+    if tcn_cache_raw.shape[1] == 16 and tcn_cache_raw.shape[-1] == 33:
+        return tcn_cache_raw
+
+    if tcn_cache_raw.shape[-1] == 16 and tcn_cache_raw.shape[2] == 33:
+        return np.transpose(tcn_cache_raw, (0, 3, 1, 2))
+
+    raise ValueError(f"Unknown TCN Cache layout: {tcn_cache_raw.shape}")
+
+
+def _reorder_tcn_caches(
+    new_outs: list[npt.NDArray], old_caches: list[npt.NDArray], tcn_ins: list[dict]
+) -> list[npt.NDArray]:
+    """Reorder TCN cache outputs to match the next inputs.
+
+    Args:
+        new_outs (list[npt.NDArray]): list of new output caches
+        old_caches (list[npt.NDArray]): list of old output caches
+        tcn_ins (list[dict]): tcn in details
+
+    Returns:
+        (list[npt.NDArray]): Correctly ordered TCN outputs
+
+    Raises:
+        ValueError: Issue in number of cache slots
+    """
+    # order by diff time amounts per tcn (2, 4, 8, 16)
+    time_slots: dict[int, list[int]] = {}
+    for idx, d in enumerate(tcn_ins):
+        T = int(d["shape"][2])
+        time_slots.setdefault(T, []).append(idx)
+
+    # building candidates from outputs
+    time_candidates: dict[int, list[np.ndarray]] = {}
+    for arr in new_outs:
+        T = int(arr.shape[2])
+        time_candidates.setdefault(T, []).append(arr)
+
+    out = [None] * 8
+    for T, slots in time_slots.items():
+        if len(slots) != 2:
+            raise ValueError(f"Expected 2 cache sltos for T={T}, got {slots}")
+        cands = time_candidates.get(T, [])
+        if len(cands) != 2:
+            raise ValueError(f"Expected 2 cache candidates for T={T}, got {len(cands)}")
+
+        a, b = slots
+        new0, new1 = cands
+
+        # compare whether to swap TCN positions or not
+        noswap = np.mean(np.abs(new0 - old_caches[a])) + np.mean(
+            np.abs(new1 - old_caches[b])
+        )
+        swap = np.mean(np.abs(new0 - old_caches[b])) + np.mean(
+            np.abs(new1 - old_caches[a])
+        )
+
+        # swapping if necessary to align tcn caches
+        # assign by continuity compared to old caches
+        if swap < noswap:
+            out[a] = new1
+            out[b] = new0
+        else:
+            out[a] = new0
+            out[b] = new1
+
+    return out
+
+
 def tflite_stream_infer(x: torch.Tensor, model_path: Path):
     """Run streaming tflite input for comparison and evaluation.
 
@@ -273,6 +363,7 @@ def tflite_stream_infer(x: torch.Tensor, model_path: Path):
         print(f"{o}\n")
     print("-" * 20)
 
+    # prefix = "serving_default_"
     # getting the input tensor indexes
     audio_in = _pick(in_details, "audio", default_idx=0)
     conv_in = _pick(in_details, "conv_cache", default_idx=1)
@@ -320,13 +411,20 @@ def tflite_stream_infer(x: torch.Tensor, model_path: Path):
         conv_cache = interpreter.get_tensor(conv_out["index"])
         tra_cache = interpreter.get_tensor(tra_out["index"])
         # tcn_cache_list = [interpreter.get_tensor(d["index"]) for d in tcn_outs]
-        tcn_cache_list = [
+        tcn_cache_raw = [
             _tcn_cache_out_read(
                 interpreter.get_tensor(tcn_outs[k]["index"]),
                 tcn_ins[k]["shape"],
             )
             for k in range(8)
         ]
+
+        # convert and reodering next input
+        tcn_new_layout = [_to_tcn_layout(arr) for arr in tcn_cache_raw]
+
+        tcn_cache_list = _reorder_tcn_caches(
+            new_outs=tcn_new_layout, old_caches=tcn_cache_list, tcn_ins=tcn_ins
+        )
 
         y_float = _dequantize(y_q, audio_out)
 
