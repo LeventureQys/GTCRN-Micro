@@ -51,8 +51,22 @@ fi
 [[ -d "${CALIB_PATH}" ]] || die "Calibration directory missing: ${CALIB_PATH}"
 
 # getting the names of required inputs
-INPUTS=(audio conv_cache tra_cache)
-for k in {0..7}; do INPUTS+=("tcn_cache_${k}"); done
+# INPUTS=(audio conv_cache tra_cache)
+# for k in {0..7}; do INPUTS+=("tcn_cache_${k}"); done
+# Converter jumbles up the inputs, so arranging explicitly
+INPUTS=(
+	tcn_cache_0
+	tcn_cache_4
+	tcn_cache_1
+	tcn_cache_2
+	tra_cache
+	tcn_cache_5
+	conv_cache
+	tcn_cache_7
+	tcn_cache_3
+	audio
+	tcn_cache_6
+)
 
 AUDIO_MEAN="[[[[0.5, 0.5]]]]"
 AUDIO_STD="[[[[%s, %s]]]]"
@@ -68,18 +82,21 @@ args=(
 	-o "${OUTPUT_PATH}"
 	-prf ${OUTPUT_PATH}${JSON_FILE}
 	-cotof
-	-oiqt
+	-coion
+	# -oiqt
 	-qt per-channel
+	-agj
 	-rtpo PReLU
 	-osd
 	-b 1
+	# -ois "audio:1,257,1,2" "conv_cache:2,1,16,6,33" "tra_cache:2,3,1,8,2" "tcn_cache_0:1,16,2,33" "tcn_cache_1:1,16,4,33" "tcn_cache_2:1,16,8,33" "tcn_cache_3:1,16,16,33" "tcn_cache_4:1,16,2,33" "tcn_cache_5:1,16,4,33" "tcn_cache_6:1,16,8,33" "tcn_cache_7:1,16,16,33"
 	-v debug
 	-ofgd
+	-nodaftc 6
 )
 
 # -kat list
 args+=(-kat "${INPUTS[@]}")
-# args+=(-kt "${INPUTS[@]}")
 
 # making the -cind list with the std calc
 for file in "${INPUTS[@]}"; do
@@ -135,5 +152,3 @@ done
 # run onnx conversion
 echo "Running ONNX -> TF..."
 uv run onnx2tf "${args[@]}"
-# uv run onnx2tf -h | sed -n '1600,1680p'
-# uv run onnx2tf -h | grep -E "\-kat|\-k |\ -kt "

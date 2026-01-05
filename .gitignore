@@ -234,4 +234,5 @@ gtcrn_micro/streaming/tflite/calibration_data/
 
 gtcrn_micro/models/onnx/
 gtcrn_micro/models/tflite
+scripts/*py
 *.npy
