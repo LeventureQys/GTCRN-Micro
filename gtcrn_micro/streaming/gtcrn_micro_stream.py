@@ -627,7 +627,8 @@ if __name__ == "__main__":
     print("\nOffline inference")
     x = torch.from_numpy(
         sf.read(
-            "./gtcrn_micro/data/DNS3/noisy_blind_testset_v3_challenge_withSNR_16k/ms_realrec_nonenglish_female_SNR_23.01dB_headset_10_spanish_1.wav",
+            # "./gtcrn_micro/data/DNS3/noisy_blind_testset_v3_challenge_withSNR_16k/ms_realrec_nonenglish_female_SNR_23.01dB_headset_10_spanish_1.wav",
+            "./gtcrn_micro/streaming/sample/noisy1.wav",
             dtype="float32",
         )[0]
     )

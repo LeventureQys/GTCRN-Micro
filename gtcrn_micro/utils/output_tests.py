@@ -15,8 +15,8 @@ def output_test() -> None:
     """Test output of trained (streaming) model in different formats."""
     # loading data
     mix, fs = sf.read(
-        "./gtcrn_micro/data/DNS3/noisy_blind_testset_v3_challenge_withSNR_16k/ms_realrec_nonenglish_female_SNR_23.01dB_headset_10_spanish_1.wav",
-        # "./gtcrn_micro/data/DNS3/noisy_blind_testset_v3_challenge_withSNR_16k/ms_realrec_english_male_SNR_20.77dB_headset_door_near.wav",
+        "./gtcrn_micro/streaming/sample/noisy1.wav",
+        # "./gtcrn_micro/streaming/sample/noisy2.wav",
         dtype="float32",
     )
     assert fs == 16000, f"Expected fs of 16000, instead got {fs}"
@@ -86,7 +86,7 @@ def output_test() -> None:
     )
     enhanced_pytorch = enhanced_stream.squeeze(0).cpu().numpy()
     sf.write(
-        "gtcrn_micro/streaming/sample/enh_torch_test2.wav",
+        "gtcrn_micro/streaming/sample/enh_torch1.wav",
         enhanced_pytorch,
         16000,
     )
@@ -144,21 +144,17 @@ def output_test() -> None:
         window=np.hanning(512) ** 0.5,
     )
     sf.write(
-        "gtcrn_micro/streaming/sample/enh_onnx_test2.wav",
+        "gtcrn_micro/streaming/sample/enh_onnx1.wav",
         enhanced_onnx.squeeze(),
         16000,
     )
 
     # TFLite
     # Load tflite model and compare outputs
-    # tflite_path = "./gtcrn_micro/streaming/tflite/gtcrn_micro_stream_simple_full_integer_quant.tflite"
-    # tflite_path = (
-    #     "gtcrn_micro/streaming/tflite/gtcrn_micro_stream_simple_float32.tflite"
-    # )
-    tflite_path = "gtcrn_micro/streaming/tflite/gtcrn_micro_stream_simple_dynamic_range_quant.tflite"
-    # tflite_path = (
-    #     "gtcrn_micro/streaming/tflite/gtcrn_micro_stream_simple_float16.tflite"
-    # )
+    tflite_path = (
+        "gtcrn_micro/streaming/tflite/gtcrn_micro_stream_simple_float16.tflite"
+    )
+    # tflite_path = "gtcrn_micro/streaming/tflite/gtcrn_micro_stream_simple_dynamic_range_quant.tflite"
     tflite_stft = tflite_stream_infer(x, model_path=tflite_path)
     t_stft = tflite_stft
     enhanced_tflite = istft(
@@ -169,7 +165,8 @@ def output_test() -> None:
         window=np.hanning(512) ** 0.5,
     )
     sf.write(
-        "gtcrn_micro/streaming/sample/enh_tflite_dynamic_range.wav",
+        "gtcrn_micro/streaming/sample/enh_tflite_float16_1.wav",
+        # "gtcrn_micro/streaming/sample/enh_tflite_dynamic_range1.wav",
         enhanced_tflite.squeeze(),
         16000,
     )
@@ -181,11 +178,13 @@ def output_test() -> None:
     print("\nOUTPUT STATS\n")
     print("\nF-Domain:\n")
     print(f"STFT MAE ONNX vs PT: {np.mean(np.abs(o_stft - p_stft))}")
-    print(f"STFT MAE TFL vs PT: {np.mean(np.abs(t_stft - p_stft))}")
-    print(f"STFT MAE TFL vs ONNX: {np.mean(np.abs(t_stft - o_stft))}")
+    print(f"STFT MAE TFLite vs PT: {np.mean(np.abs(t_stft - p_stft))}")
+    print(f"STFT MAE TFLite vs ONNX: {np.mean(np.abs(t_stft - o_stft))}")
 
     m = np.mean(np.abs(t_stft - p_stft), axis=(0, 1, 3))
-    print(f"TFL vs PT frame MAE start - mid - end: {m[0]} - {m[len(m) // 2]} - {m[-1]}")
+    print(
+        f"TFLite vs PT frame MAE start - mid - end: {m[0]} - {m[len(m) // 2]} - {m[-1]}"
+    )
 
     print("\nTime-Domain:\n")
     print(
@@ -198,17 +197,16 @@ def output_test() -> None:
     print("onnx median abs diff:", np.median(abs_diff))
 
     print(
-        f"Tflite outputs error vs pytorch: {np.mean(np.abs(enhanced_tflite - enhanced_pytorch))}"
+        f"TFLite outputs error vs pytorch: {np.mean(np.abs(enhanced_tflite - enhanced_pytorch))}"
     )
     print(
-        f"Tflite outputs error vs onnx: {np.mean(np.abs(enhanced_tflite - enhanced_onnx))}"
+        f"TFLite outputs error vs onnx: {np.mean(np.abs(enhanced_tflite - enhanced_onnx))}"
     )
     diff_tflite = enhanced_tflite - enhanced_pytorch
     abs_diff_t = np.abs(diff_tflite)
     print("TFLite MAE:", abs_diff_t.mean())
     print("TFLite median abs diff:", np.median(abs_diff_t))
 
-    print("DONE\n")
     print("*" * 10)
 
 

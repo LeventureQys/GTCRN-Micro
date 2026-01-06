@@ -228,8 +228,6 @@ gtcrn_micro/models/gtcrn_micro_zero.py
 gtcrn_micro/streaming/onnx/*.cpp
 gtcrn_micro/streaming/onnx/*.sh
 gtcrn_micro/streaming/onnx/test*
-gtcrn_micro/streaming/tflite/*.tflite
-gtcrn_micro/streaming/tflite/variables
 gtcrn_micro/streaming/tflite/calibration_data/
 
 gtcrn_micro/models/onnx/

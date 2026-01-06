@@ -351,17 +351,18 @@ def tflite_stream_infer(x: torch.Tensor, model_path: Path):
     in_details = interpreter.get_input_details()
     out_details = interpreter.get_output_details()
 
-    print("-" * 20)
-    print("INTERPRETER DETAILS\n")
-    print("\nIN DETAILS:\n")
-    for i in in_details:
-        print(f"{i}\n")
-    print("*" * 20)
-    print("*" * 20)
-    print("\nOUT DETAILS:\n")
-    for o in out_details:
-        print(f"{o}\n")
-    print("-" * 20)
+    # uncomment for checking interpreter details
+    # print("-" * 20)
+    # print("INTERPRETER DETAILS\n")
+    # print("\nIN DETAILS:\n")
+    # for i in in_details:
+    #     print(f"{i}\n")
+    # print("*" * 20)
+    # print("*" * 20)
+    # print("\nOUT DETAILS:\n")
+    # for o in out_details:
+    #     print(f"{o}\n")
+    # print("-" * 20)
 
     # getting the input tensor indexes
     audio_in = _pick(in_details, "audio", default_idx=0)
