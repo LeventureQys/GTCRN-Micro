@@ -12,9 +12,11 @@ from gtcrn_micro.utils.tflite_utils import tflite_stream_infer
 
 
 def output_test() -> None:
+    """Test output of trained (streaming) model in different formats."""
     # loading data
     mix, fs = sf.read(
         "./gtcrn_micro/data/DNS3/noisy_blind_testset_v3_challenge_withSNR_16k/ms_realrec_nonenglish_female_SNR_23.01dB_headset_10_spanish_1.wav",
+        # "./gtcrn_micro/data/DNS3/noisy_blind_testset_v3_challenge_withSNR_16k/ms_realrec_english_male_SNR_20.77dB_headset_door_near.wav",
         dtype="float32",
     )
     assert fs == 16000, f"Expected fs of 16000, instead got {fs}"
@@ -153,11 +155,10 @@ def output_test() -> None:
     # tflite_path = (
     #     "gtcrn_micro/streaming/tflite/gtcrn_micro_stream_simple_float32.tflite"
     # )
-    # tflite_path = "gtcrn_micro/streaming/tflite/gtcrn_micro_stream_simple_dynamic_range_quant.tflite"
-    tflite_path = (
-        "gtcrn_micro/streaming/tflite/gtcrn_micro_stream_simple_float16.tflite"
-    )
-    # tflite_path = "./gtcrn_micro/streaming/tflite/gtcrn_micro_stream_simple_int8.tflite"
+    tflite_path = "gtcrn_micro/streaming/tflite/gtcrn_micro_stream_simple_dynamic_range_quant.tflite"
+    # tflite_path = (
+    #     "gtcrn_micro/streaming/tflite/gtcrn_micro_stream_simple_float16.tflite"
+    # )
     tflite_stft = tflite_stream_infer(x, model_path=tflite_path)
     t_stft = tflite_stft
     enhanced_tflite = istft(
@@ -168,7 +169,7 @@ def output_test() -> None:
         window=np.hanning(512) ** 0.5,
     )
     sf.write(
-        "gtcrn_micro/streaming/sample/enh_tflite_f16.wav",
+        "gtcrn_micro/streaming/sample/enh_tflite_dynamic_range.wav",
         enhanced_tflite.squeeze(),
         16000,
     )
@@ -182,9 +183,11 @@ def output_test() -> None:
     print(f"STFT MAE ONNX vs PT: {np.mean(np.abs(o_stft - p_stft))}")
     print(f"STFT MAE TFL vs PT: {np.mean(np.abs(t_stft - p_stft))}")
     print(f"STFT MAE TFL vs ONNX: {np.mean(np.abs(t_stft - o_stft))}")
+
     m = np.mean(np.abs(t_stft - p_stft), axis=(0, 1, 3))
     print(f"TFL vs PT frame MAE start - mid - end: {m[0]} - {m[len(m) // 2]} - {m[-1]}")
 
+    print("\nTime-Domain:\n")
     print(
         f"Onnx outputs error vs pytorch: {np.mean(np.abs(enhanced_onnx - enhanced_pytorch))}"
     )
@@ -193,6 +196,7 @@ def output_test() -> None:
 
     print("onnx MAE:", abs_diff.mean())
     print("onnx median abs diff:", np.median(abs_diff))
+
     print(
         f"Tflite outputs error vs pytorch: {np.mean(np.abs(enhanced_tflite - enhanced_pytorch))}"
     )

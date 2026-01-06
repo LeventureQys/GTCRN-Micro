@@ -363,7 +363,6 @@ def tflite_stream_infer(x: torch.Tensor, model_path: Path):
         print(f"{o}\n")
     print("-" * 20)
 
-    # prefix = "serving_default_"
     # getting the input tensor indexes
     audio_in = _pick(in_details, "audio", default_idx=0)
     conv_in = _pick(in_details, "conv_cache", default_idx=1)
