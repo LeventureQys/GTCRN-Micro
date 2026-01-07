@@ -15,7 +15,14 @@ from tqdm import tqdm
 
 # NEEDED FOR DNS3
 def _extract_fileid_from_noisy(path: str):
-    """Grab the fileid substring from the *noisy* filename."""
+    """Grab the fileid substring from the *noisy* filename.
+
+    Args:
+        path (str): str representation of that path.
+
+    Returns:
+        Correct fileid
+    """
     base = os.path.basename(path)
     if "fileid_" not in base:
         return None
@@ -25,7 +32,6 @@ def _extract_fileid_from_noisy(path: str):
 # for bulk inference
 def main(args):
     cfg_infer = OmegaConf.load(args.config)
-    # cfg_network = OmegaConf.load(cfg_infer.network.config)
 
     noisy_folder = cfg_infer.test_dataset.noisy_dir
     clean_folder = cfg_infer.test_dataset.clean_dir
@@ -96,7 +102,6 @@ def main(args):
         y_complex = torch.view_as_complex(y_torch.contiguous())
         # ---
 
-        # output = torch.view_as_complex(output.contiguous())
         enhanced = torch.istft(
             y_complex,
             512,

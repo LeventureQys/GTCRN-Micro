@@ -15,7 +15,14 @@ from gtcrn_micro.models.gtcrn_micro import GTCRNMicro as Model
 
 # NEEDED FOR DNS3
 def _extract_fileid_from_noisy(path: str):
-    """Grab the fileid substring from the *noisy* filename."""
+    """Grab the fileid substring from the *noisy* filename.
+
+    Args:
+        path (str): str representation of that path.
+
+    Returns:
+        Correct fileid
+    """
     base = os.path.basename(path)
     if "fileid_" not in base:
         return None
