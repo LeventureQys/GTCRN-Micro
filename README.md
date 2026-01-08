@@ -1,4 +1,4 @@
-# GTCRN-Micro: *Microcontroller Speech Enhancement* 
+# GTCRN-Micro: *An attempt to rebuild a Speech Enhancement model for Microcontrollers* 
 <div align="center">
 
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
@@ -6,27 +6,27 @@
 [![Actions status](https://github.com/bglid/SERTime/workflows/build-desktop/badge.svg)](https://github.com/bglid/SERTime/actions)
 [![Security: bandit](https://img.shields.io/badge/security-bandit-green.svg)](https://github.com/PyCQA/bandit)
 - - -
-**WIP**
+
+*Initially, this the goal of this project was to build a TCN-focused rebuild of GTCRN onto an MCU. Unfortunately, the current approach does not seem viable for targeting MCUs. I encourage anyone reading to give an attempt with the given PyTorch checkpoints and streaming models to attempt to quantize to int8. If you manage to be successful, please let me know! I would love to be wrong here.*
+
+*I unfortunately need to step away from the project for some time. Therefore, I will be unable to continue testing out ways to try and push this project towards MCU Speech Enhancement with this approach for a short while.*
+
 - - -
 
-*Project is still underway. Currently working through the rearchitecture for the ESP32-S3 deployment with* `tflite` *representations of the adjusted model architecture. Training a new architecture with this in mind* 
-
-*Second goal is to use STM32Cube_AI to deploy an architecture closer to the original* [GTCRN](https://github.com/Xiaobin-Rong/gtcrn) *to STM32 hardware*
-
-*For updates, check out either the issues, or the project roadmap [here](./docs/plan.md) and [here](./docs/TODO.md). Please submit any issues if you catch any. It's greatly appreciated!*
+*For updates, check out either the issues, or the project roadmap [here](./docs/plan.md) and [here](./docs/TODO.md). Please submit any issues if you catch any. It's greatly appreciated! If you manage to get an integer quantized version running, please let me know!*
 
 - - - 
 </div>
 
-## Project Background
+## Initial Project Background
 
-The goal of this project is to walk through adjusting a modern, powerful, lightweight speech ehancement model to quantize it to an int8 representation and attempt deploy it to an ESP32-S3 with `tflite`, while trying to preserve as much performance as possible.
+The goal of this project was to adjust a modern, powerful, lightweight speech ehancement model to quantize it to an int8 representation. Quantization was the goal to attempt deploy it to an ESP32-S3 with `tflite`, while trying to preserve as much performance as possible.
 
 The motivation for this project comes from a general interest in designing speech processing (mainly speech enhancement) models that can run on microcontrollers. Impresive models such as GTCRN showcase significant advancements in designing speech enhancement that maintain great performance whilst being very lightweight. I have been generally curious in working through the process of quantizing and deploying a model like GTCRN to a microcontroller for quite some time. Ultimately, it's a passion project that allows me to build skills in this area of interest, and help provide insight for anyone else looking to do the same. 
 
 Please check out the [acknowledgements!](#acknowledgements)
 
-<!-- ## How to use
+## How to use
 
 ### Setup
 <details>
@@ -78,22 +78,33 @@ uv sync
 ```
 </details>
 
-### Using the offline non-quantized model
-*WIP*
+### Using the offline torch model
 
 - Trained model checkpoints can be found in [ckpts](./gtcrn_micro/ckpts/)
-- Onnx files can be found int [onxx](./gtcrn_micro/models/onnx/)
-...
+- Also if for some reason you want a *non-streaming* version of the `ONNX` model, that can be found here: [gtcrn_micro.onnx](./gtcrn_micro/streaming/onnx/gtcrn_micro.onnx)
 
-### Quantized model
-*WIP*
+### Using the streaming variants of the model
 
-- Quantized tflite files can be found in [tflite](./gtcrn_micro/models/tflite/)
-     - The necessary [replacement .json](./gtcrn_micro/models/tflite/replace_gtcrn_micro.json) is there for example if you want to recreate the quantization
-... -->
+- **PyTorch Streaming model**:
+   - Essentially, you'll want to load up the non-streaming model weights as normal, then run convert_to_stream function passing in the streaming model in eval. See the "how_to" guide for more details: [how_to.md](./docs/how_to.md)
+
+- **Streaming `ONNX` models**: 
+  - Found at [gtcrn_micro_stream.onnx](./gtcrn_micro/streaming/onnx/gtcrn_micro_stream.onnx) & [gtcrn_micro_stream_simple.onnx](./gtcrn_micro/streaming/onnx/gtcrn_micro_stream_simple.onnx)
+   - These should both be the same, the underlying graph is just simplified in the latter if you decide to try and analyze the model with Netron
+- **Streaming `TFLite (LiteRT)` models**: 
+  - Found at [gtcrn_micro/streaming/tflite](./gtcrn_micro/streaming/tflite/)
+   - **NOTE:** These are mainly included here for completeness, but their performance is notably degraded. These were a part of the attempt to deploy to MCUs. I advise that you use the `ONNX` models.
+
+
 - - - 
 
-## Roadmap / to-dos 
+## Archived Roadmap / to-dos 
+
+##### *Update 01/07/2025:*
+
+Unfortunately, I am unsure on the viability of this approach for MCUs. Certain bottlenecks when quantizing have completely halted being able to move forward in it's current state. I unfortunately will have to step away from this project for some time. Therefore, I will update the description of the project, focused on providing a TCN-focused rebuild of GTCRN. The PyTorch and ONNX model are viable to use, however they do not outperform GTCRN, so I recommend using the original model.
+
+I am still running some final evaluations for the streaming models and will update with these metrics once they're done. For now, for performance on the TCN focused architecture, see [gtcrn_micro](./gtcrn_micro/README.md).
 
 ##### *Update 12/26/2025:*
 
@@ -102,9 +113,9 @@ New model has been trained with a few architecture changes. The main changes are
 Next step is to use the created Streaming architecture to:
  - 1. Test performance for the PyTorch streaming variant
  - 2. Export the streaming variant to ONNX and test performance
- - 3. Export ONNX streaming varian to TFLite and test performance.
+ - 3. ~~Export ONNX streaming varian to TFLite and test performance.~~
 
-Once those are completed, this will move to MCU deployment tests, targeting the **ESP32-S3** first. 
+~~Once those are completed, this will move to MCU deployment tests, targeting the **ESP32-S3** first.~~
 
 
 ##### *Update 12/19/2025:*
