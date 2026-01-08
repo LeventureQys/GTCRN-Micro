@@ -46,6 +46,39 @@ def get_model_param_count(model):
     return total_params, trainable_params
 
 
+def calculate_input_shape_from_bytes(audio_bytes, sample_rate=16000, bits_per_sample=16, 
+                                     num_channels=1, hop_length=256, n_fft=512):
+    """
+    根据音频字节长度计算输入形状
+    
+    Args:
+        audio_bytes: 音频字节数
+        sample_rate: 采样率 (默认: 16000 Hz)
+        bits_per_sample: 每个采样的位数 (默认: 16, 即2字节)
+        num_channels: 声道数 (默认: 1, 单声道)
+        hop_length: STFT hop length (默认: 256)
+        n_fft: FFT 大小 (默认: 512)
+    
+    Returns:
+        (batch, freq, time_frames, channels) 形状元组
+    """
+    # 计算每个采样的字节数
+    bytes_per_sample = bits_per_sample // 8
+    
+    # 计算总采样点数（时间上的采样点数）
+    # 对于多声道音频，需要除以声道数得到时间上的采样点数
+    total_samples = audio_bytes // (bytes_per_sample * num_channels)
+    
+    # 计算 STFT 时间帧数
+    # 时间帧数 = 采样点数 / hop_length
+    time_frames = max(1, total_samples // hop_length)
+    
+    # 频率维度 (n_fft // 2 + 1)
+    freq_bins = n_fft // 2 + 1  # 257 for n_fft=512
+    
+    return (1, freq_bins, time_frames, 2)  # 2 是复数频谱的实部和虚部
+
+
 def profile_inference_memory(model, input_shape=(1, 257, 63, 2), device='cpu', warmup=3, runs=10):
     """分析推理时的内存占用"""
     model = model.to(device)
@@ -201,28 +234,59 @@ def main():
         print(f"  推理内存占用 (最大): {format_size(memory_stats['max_inference'])}")
         print(f"  推理内存占用 (最小): {format_size(memory_stats['min_inference'])}")
     
-    # 测试不同输入大小
+    # 测试不同音频字节长度的内存占用
     print("\n" + "-" * 80)
-    print("5. 不同输入大小的内存占用")
+    print("5. 不同音频字节长度的内存占用 (16kHz采样率)")
     print("-" * 80)
-    test_shapes = [
-        (1, 257, 63, 2),   # 1秒音频
-        (1, 257, 126, 2),  # 2秒音频
-        (1, 257, 252, 2),  # 4秒音频
-        (1, 257, 504, 2),  # 8秒音频
-    ]
     
-    for shape in test_shapes:
-        time_frames = shape[2]
-        audio_duration = time_frames * 256 / 16000  # 假设采样率16kHz, hop_length=256
-        mem_stats = profile_inference_memory(model, input_shape=shape, device=device, runs=5)
+    # 测试字节长度：512, 1024, 1536 bytes
+    test_byte_sizes = [512, 1024, 1536]
+    sample_rate = 16000
+    hop_length = 256
+    bits_per_sample = 16
+    num_channels = 1
+    
+    print(f"音频格式: {bits_per_sample}位, {num_channels}声道, {sample_rate}Hz采样率")
+    print(f"STFT参数: hop_length={hop_length}, n_fft=512")
+    print("-" * 80)
+    
+    for audio_bytes in test_byte_sizes:
+        # 计算输入形状
+        input_shape = calculate_input_shape_from_bytes(
+            audio_bytes, 
+            sample_rate=sample_rate,
+            bits_per_sample=bits_per_sample,
+            num_channels=num_channels,
+            hop_length=hop_length,
+            n_fft=512
+        )
+        
+        # 计算对应的音频信息
+        bytes_per_sample = bits_per_sample // 8
+        total_samples = audio_bytes // (bytes_per_sample * num_channels)
+        audio_duration = total_samples / sample_rate if sample_rate > 0 else 0
+        time_frames = input_shape[2]
+        
+        # 测试内存占用
+        mem_stats = profile_inference_memory(
+            model, 
+            input_shape=input_shape, 
+            device=device, 
+            runs=5,
+            warmup=2
+        )
         
         if device == 'cuda':
             peak_mem = mem_stats['peak'] - mem_stats['initial']
         else:
             peak_mem = mem_stats['max_inference']
         
-        print(f"  输入形状 {shape} (~{audio_duration:.1f}秒): {format_size(peak_mem)}")
+        print(f"  音频字节: {audio_bytes:4d}B | "
+              f"采样点数: {total_samples:4d} | "
+              f"时长: {audio_duration*1000:6.2f}ms | "
+              f"时间帧: {time_frames:2d} | "
+              f"输入形状: {input_shape} | "
+              f"内存占用: {format_size(peak_mem)}")
     
     # 总结
     print("\n" + "=" * 80)
