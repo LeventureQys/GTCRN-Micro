@@ -1,6 +1,63 @@
 # How-To guide for various items in project
 
 - - -
+## Contents
+
+1. [Setup](#setup)
+2. [Running Streaming Model](#using-the-streaming-variants-of-the-model)
+
+- - - 
+### Setup
+<details>
+
+#### Clone the project:
+```bash
+git clone https://github.com/benjaminglidden/GTCRN-Micro.git
+cd GTCRN-Micro
+```
+This project uses uv as the dependency manager. 
+- To get setup with the project dependencies, first thing is to make sure [uv](https://docs.astral.sh/uv/) is installed on your device:
+
+#### Installing uv:
+**Linux & Mac OS**
+
+From the **terminal**:
+ - Use curl to download the script and execute it with sh:
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+ - If for some reason you don't have `curl`, use `wget`
+
+```bash
+wget -qO- https://astral.sh/uv/install.sh | sh
+```
+
+**Windows**
+
+From **PowerShell:**
+
+ - Use `irm` to download the script and execute it with `iex`:
+
+```bash
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+
+####  Verify UV installation
+
+ - To verify you've installed it correctly, from your Terminal (or PowerShell), run:
+```
+uv --version
+```
+ - You should be returned a version of UV
+
+#### Install the dependencies
+```bash
+uv sync
+```
+</details>
+
+- - -
 
 ## Using the streaming variants of the model
 

@@ -28,62 +28,15 @@ Please check out the [acknowledgements!](#acknowledgements)
 
 ## How to use
 
-### Setup
-<details>
+ - For a detailed setup, see [how_to.md](./docs/how_to.md)
 
-#### Clone the project:
-```bash
-git clone https://github.com/benjaminglidden/GTCRN-Micro.git
-cd GTCRN-Micro
-```
-This project uses uv as the dependency manager. 
-- To get setup with the project dependencies, first thing is to make sure [uv](https://docs.astral.sh/uv/) is installed on your device:
 
-#### Installing uv:
-**Linux & Mac OS**
-
-From the **terminal**:
- - Use curl to download the script and execute it with sh:
-
-```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
-```
- - If for some reason you don't have `curl`, use `wget`
-
-```bash
-wget -qO- https://astral.sh/uv/install.sh | sh
-```
-
-**Windows**
-
-From **PowerShell:**
-
- - Use `irm` to download the script and execute it with `iex`:
-
-```bash
-powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
-```
-
-####  Verify UV installation
-
- - To verify you've installed it correctly, from your Terminal (or PowerShell), run:
-```
-uv --version
-```
- - You should be returned a version of UV
-
-#### Install the dependencies
-```bash
-uv sync
-```
-</details>
-
-### Using the offline torch model
+#### Using the offline torch model
 
 - Trained model checkpoints can be found in [ckpts](./gtcrn_micro/ckpts/)
 - Also if for some reason you want a *non-streaming* version of the `ONNX` model, that can be found here: [gtcrn_micro.onnx](./gtcrn_micro/streaming/onnx/gtcrn_micro.onnx)
 
-### Using the streaming variants of the model
+#### Using the streaming variants of the model
 
 - **PyTorch Streaming model**:
    - Essentially, you'll want to load up the non-streaming model weights as normal, then run convert_to_stream function passing in the streaming model in eval. See the "how_to" guide for more details: [how_to.md](./docs/how_to.md)
