@@ -1,13 +1,17 @@
+# Original GTCRN author Xiaobin Rong: https://github.com/Xiaobin-Rong/gtcrn
 """
 GTCRN-Micro-Stream: MCU-focused rebuild of GTCRN, setup with streaming caching
 """
 
+import os
 import time
 
 import numpy as np
+import onnxruntime
 import soundfile as sf
 import torch
 import torch.nn as nn
+from librosa import istft
 from tqdm import tqdm
 
 from gtcrn_micro.models.gtcrn_micro import GTCRNMicro
@@ -16,6 +20,7 @@ from gtcrn_micro.streaming.conversion.convolution import (
     StreamConv2d,
     StreamConvTranspose2d,
 )
+from gtcrn_micro.streaming.conversion.stream_onnx import stream2onnx
 
 
 class ERB(nn.Module):
@@ -413,22 +418,39 @@ class StreamEncoder(nn.Module):
 
         # streaming forward pass for Streaming blocks
         # NOTE: due to dilation quant restrictions, need to make smaller dilation caches
-        x, conv_cache[:, :, :2, :], tra_cache[0] = self.en_convs[2](
-            x, conv_cache[:, :, :2, :], tra_cache[0]
-        )
+        # x, conv_cache[:, :, :2, :], tra_cache[0] = self.en_convs[2](
+        #     x, conv_cache[:, :, :2, :], tra_cache[0]
+        # )
+        # en_outs.append(x)
+        #
+        # x, conv_cache[:, :, 2:4, :], tra_cache[1] = self.en_convs[3](
+        #     x, conv_cache[:, :, 2:4, :], tra_cache[1]
+        # )
+        # en_outs.append(x)
+        #
+        # x, conv_cache[:, :, 4:6, :], tra_cache[2] = self.en_convs[4](
+        #     x, conv_cache[:, :, 4:6, :], tra_cache[2]
+        # )
+        # en_outs.append(x)
+
+        # NOTE: To fix with exporting and quantization to int8 issues
+        # conv cache
+        c0, c1, c2 = torch.split(conv_cache, 2, dim=2)
+
+        # tra cache
+        t0, t1, t2 = torch.unbind(tra_cache, dim=0)
+
+        x, c0_out, t0_out = self.en_convs[2](x, c0, t0)
+        en_outs.append(x)
+        x, c1_out, t1_out = self.en_convs[3](x, c1, t1)
+        en_outs.append(x)
+        x, c2_out, t2_out = self.en_convs[4](x, c2, t2)
         en_outs.append(x)
 
-        x, conv_cache[:, :, 2:4, :], tra_cache[1] = self.en_convs[3](
-            x, conv_cache[:, :, 2:4, :], tra_cache[1]
-        )
-        en_outs.append(x)
+        conv_cache_out = torch.cat([c0_out, c1_out, c2_out], dim=2)
+        tra_cache_out = torch.stack([t0_out, t1_out, t2_out], dim=0)
 
-        x, conv_cache[:, :, 4:6, :], tra_cache[2] = self.en_convs[4](
-            x, conv_cache[:, :, 4:6, :], tra_cache[2]
-        )
-        en_outs.append(x)
-
-        return x, en_outs, conv_cache, tra_cache
+        return x, en_outs, conv_cache_out, tra_cache_out
 
 
 class StreamDecoder(nn.Module):
@@ -487,22 +509,35 @@ class StreamDecoder(nn.Module):
 
     def forward(self, x, en_outs, conv_cache, tra_cache):
         # decoding the cache backwards
-        x, conv_cache[:, :, 4:6, :], tra_cache[0] = self.de_convs[0](
-            x + en_outs[4], conv_cache[:, :, 4:6, :], tra_cache[0]
-        )
+        # x, conv_cache[:, :, 4:6, :], tra_cache[0] = self.de_convs[0](
+        #     x + en_outs[4], conv_cache[:, :, 4:6, :], tra_cache[0]
+        # )
+        #
+        # x, conv_cache[:, :, 2:4, :], tra_cache[1] = self.de_convs[1](
+        #     x + en_outs[3], conv_cache[:, :, 2:4, :], tra_cache[1]
+        # )
+        #
+        # x, conv_cache[:, :, :2, :], tra_cache[2] = self.de_convs[2](
+        #     x + en_outs[2], conv_cache[:, :, :2, :], tra_cache[2]
+        # )
+        #
+        # NOTE: To fix with exporting and quantization to int8 issues
+        # conv cache
+        c0, c1, c2 = torch.split(conv_cache, [2, 2, 2], dim=2)
 
-        x, conv_cache[:, :, 2:4, :], tra_cache[1] = self.de_convs[1](
-            x + en_outs[3], conv_cache[:, :, 2:4, :], tra_cache[1]
-        )
+        # tra cache
+        t0, t1, t2 = torch.unbind(tra_cache, dim=0)
 
-        x, conv_cache[:, :, :2, :], tra_cache[2] = self.de_convs[2](
-            x + en_outs[2], conv_cache[:, :, :2, :], tra_cache[2]
-        )
+        x, c2_out, t0_out = self.de_convs[0](x + en_outs[4], c2, t0)
+        x, c1_out, t1_out = self.de_convs[1](x + en_outs[3], c1, t1)
+        x, c0_out, t2_out = self.de_convs[2](x + en_outs[2], c0, t2)
 
+        conv_cache_out = torch.cat([c0_out, c1_out, c2_out], dim=2)
+        tra_cache_out = torch.stack([t0_out, t1_out, t2_out], dim=0)
         # iter as normal through last two conv blocks
         for i in range(3, 5):
             x = self.de_convs[i](x + en_outs[4 - i])
-        return x, conv_cache, tra_cache
+        return x, conv_cache_out, tra_cache_out
 
 
 class Mask(nn.Module):
@@ -539,9 +574,11 @@ class StreamGTCRNMicro(nn.Module):
         self.mask = Mask()
 
     def forward(self, spec, conv_cache, tra_cache, tcn_cache):
-        """
-        spec: (B, F, T, 2)
+        """Streaming forward pass.
+        spec: (B, F, T, C)
         conv_cache: [en_cache, de_cache], (2, B, C, 8(kT-1), F) = (2, 1, 16, 16, 33)
+        tra_cache: [en_cache, de_cache], (2, 3, 1, 8, 2)
+        tcn_cache: [en_cache, de_cache],(2, B, C, 2*d, F) = (2, 2, 16, 2*d, 33)
         """
         spec_ref = spec  # (B,F,T,2)
 
@@ -590,7 +627,8 @@ if __name__ == "__main__":
     print("\nOffline inference")
     x = torch.from_numpy(
         sf.read(
-            "./gtcrn_micro/data/DNS3/noisy_blind_testset_v3_challenge_withSNR_16k/ms_realrec_emotional_female_SNR_17.74dB_headset_A2AHXGFXPG6ZSR_Water_far_Laughter_12.wav",
+            # "./gtcrn_micro/data/DNS3/noisy_blind_testset_v3_challenge_withSNR_16k/ms_realrec_nonenglish_female_SNR_23.01dB_headset_10_spanish_1.wav",
+            "./gtcrn_micro/streaming/sample/noisy1.wav",
             dtype="float32",
         )[0]
     )
@@ -613,47 +651,143 @@ if __name__ == "__main__":
 
     # --------------
     # streaming inference
-    print("\nStreaming inference")
-    # conv_cache = torch.zeros(2, 1, 16, 16, 33).to(device)
+    # print("\nStreaming inference")
     conv_cache = torch.zeros(2, 1, 16, 6, 33).to(device)
     tra_cache = torch.zeros(2, 3, 1, 8, 2).to(device)
     tcn_cache = [
         [torch.zeros(1, 16, 2 * d, 33, device=device) for d in [1, 2, 4, 8]],
         [torch.zeros(1, 16, 2 * d, 33, device=device) for d in [1, 2, 4, 8]],
     ]
-    ys = []
-    times = []
-    for i in tqdm(range(x.shape[2])):
-        xi = x[:, :, i : i + 1]
-        tic = time.perf_counter()
-        with torch.no_grad():
-            yi, conv_cache, tra_cache, tcn_cache = stream_model(
-                xi, conv_cache, tra_cache, tcn_cache
-            )
-        toc = time.perf_counter()
-        times.append((toc - tic) * 1000)
-        ys.append(yi)
-    ys = torch.cat(ys, dim=2)
-
-    enhanced_stream = torch.view_as_complex(ys.contiguous())
-    enhanced_stream = torch.istft(
-        enhanced_stream,
-        512,
-        256,
-        512,
-        torch.hann_window(512).pow(0.5),
-        return_complex=False,
-    )
+    # ys = []
+    # times = []
+    # for i in tqdm(range(x.shape[2])):
+    #     xi = x[:, :, i : i + 1]
+    #     tic = time.perf_counter()
+    #     with torch.no_grad():
+    #         yi, conv_cache, tra_cache, tcn_cache = stream_model(
+    #             xi, conv_cache, tra_cache, tcn_cache
+    #         )
+    #     toc = time.perf_counter()
+    #     times.append((toc - tic) * 1000)
+    #     ys.append(yi)
+    # ys = torch.cat(ys, dim=2)
+    #
+    # enhanced_stream = torch.view_as_complex(ys.contiguous())
+    # enhanced_stream = torch.istft(
+    #     enhanced_stream,
+    #     512,
+    #     256,
+    #     512,
+    #     torch.hann_window(512).pow(0.5),
+    #     return_complex=False,
+    # )
     # enhanced_stream = enhanced_stream.squeeze(0).cpu().numpy()
     # sf.write(
     #     "./gtcrn_micro/streaming/sample_wavs/enh.wav", enhanced_stream.squeeze(), 16000
     # )
-    print(
-        ">>> inference time: mean: {:.1f}ms, max: {:.1f}ms, min: {:.1f}ms".format(
-            sum(times) / len(times), max(times), min(times)
-        )
-    )
-    print(">>> Streaming error, FREQ domain:", np.abs(y - ys).max())
-    print(">>> Streaming error, TIME domain:", np.abs(enhanced - enhanced_stream).max())
+    # print(
+    #     ">>> inference time: mean: {:.1f}ms, max: {:.1f}ms, min: {:.1f}ms".format(
+    #         sum(times) / len(times), max(times), min(times)
+    #     )
+    # )
+    # print(">>> Streaming error, FREQ domain:", np.abs(y - ys).max())
+    # print(">>> Streaming error, TIME domain:", np.abs(enhanced - enhanced_stream).max())
 
     # --------------
+    # ONNX conversion
+    batch_size = 1
+    frequency_bins = 257
+    time_steps = 1
+
+    onnx_file = "./gtcrn_micro/streaming/onnx/gtcrn_micro_stream.onnx"
+    if not os.path.exists(onnx_file):
+        print("-" * 20)
+        print("\nConverting streaming model from PyTorch -> ONNX\n")
+        input = torch.randn(batch_size, frequency_bins, time_steps, 2, device=device)
+        stream2onnx(
+            stream_model=stream_model,
+            sample_input=input,
+            conv_cache=conv_cache,
+            tra_cache=tra_cache,
+            tcn_cache=tcn_cache,
+            model_name="gtcrn_micro_stream",
+        )
+
+        if os.path.exists(onnx_file):
+            print(f"\nONNX file created at: {onnx_file}\n")
+        else:
+            print("\nError in creating onnx file...\n")
+
+        print("-" * 20)
+
+    # test run of the onnx model
+    session = onnxruntime.InferenceSession(
+        onnx_file.split(".onnx")[0] + "_simple.onnx",
+        None,
+        providers=["CPUExecutionProvider"],
+    )
+    # re-init the caches
+    conv_cache = np.zeros([2, 1, 16, 6, 33], dtype="float32")
+    tra_cache = np.zeros([2, 3, 1, 8, 2], dtype="float32")
+    tcn_caches = [
+        np.zeros((1, 16, 2, 33), dtype=np.float32),
+        np.zeros((1, 16, 4, 33), dtype=np.float32),
+        np.zeros((1, 16, 8, 33), dtype=np.float32),
+        np.zeros((1, 16, 16, 33), dtype=np.float32),
+        np.zeros((1, 16, 2, 33), dtype=np.float32),
+        np.zeros((1, 16, 4, 33), dtype=np.float32),
+        np.zeros((1, 16, 8, 33), dtype=np.float32),
+        np.zeros((1, 16, 16, 33), dtype=np.float32),
+    ]
+
+    T_list = []
+    outputs = []
+    print("\nChecking inputs:\n")
+    sess_inputs = session.get_inputs()
+    for j, inp in enumerate(sess_inputs):
+        print(j, inp.name, inp.shape, inp.type)
+
+    print("\nRunning ONNX inference...\n")
+
+    inputs = x.numpy()
+    for i in tqdm(range(inputs.shape[-2])):
+        start = time.perf_counter()
+        output_onnx = session.run(
+            None,
+            {
+                "audio": inputs[..., i : i + 1, :],
+                "conv_cache": conv_cache,
+                "tra_cache": tra_cache,
+                **{f"tcn_cache_{k}": tcn_caches[k] for k in range(8)},
+            },
+        )
+        # debugging outputs
+        # for m, outp in enumerate(session.get_outputs()):
+        #     print(m, outp.name, outp.shape, outp.type)
+
+        end = time.perf_counter()
+        # need to unpack the onnx outputs
+        out_i = output_onnx[0]
+        conv_cache = output_onnx[1]
+        tra_cache = output_onnx[2]
+        tcn_caches = output_onnx[3:]
+
+        T_list.append(end - start)
+        outputs.append(out_i)
+
+    outputs = np.concatenate(outputs, axis=2)
+    enhanced = istft(
+        outputs[..., 0] + 1j * outputs[..., 1],
+        n_fft=512,
+        hop_length=256,
+        win_length=512,
+        window=np.hanning(512) ** 0.5,
+    )
+    sf.write("gtcrn_micro/streaming/sample/enh_onnx.wav", enhanced.squeeze(), 16000)
+
+    print("*" * 20)
+    print(f"\nONNX error: {np.abs(y - outputs).max()}")
+    print(
+        f"\nInference time: \n\tmean: {1e3 * np.mean(T_list):.1f}ms \n\tmax: {1e3 * np.max(T_list):.1f}ms \n\tmin: {1e3 * np.min(T_list):.1f}ms"
+    )
+    print(f"\nRTF: {1e3 * np.mean(T_list) / 16}")

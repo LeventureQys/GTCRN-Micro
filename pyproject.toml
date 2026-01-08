@@ -3,7 +3,7 @@ name = "GTCRN-micro"
 version = "0.1.0"
 description = "Evaluation and Model changes"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dependencies = [
     "ai-edge-litert==1.2.0",
     "bandit>=1.8.6",

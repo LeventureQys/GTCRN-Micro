@@ -1,4 +1,8 @@
 # To-Dos:
+- - - 
+# NOTE: 
+ - Project has been determined to not be deployable to MCU in current form and I have to step away. 
+ - I am leaving these here just for archival purposes.
 - - -
  * ###### Check out the [plan.md](./plan.md) file to see the goals at a larger bird's eye view.
 - - - 

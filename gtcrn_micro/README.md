@@ -32,7 +32,7 @@
 | GTCRN-Micro    | - | 10.41  | 9.85    | 1.98  | 0.85  |
 | GTCRN-Micro Streaming    | - | ...  | ...    | ...  | ...  |
 | GTCRN-Micro Streaming  (ONNX)  | - | ...  | ...    | ...  | ...  |
-| GTCRN-Micro Streaming (.tflite) | int8  | ...  | ...    | ...  | ...  |
+| GTCRN-Micro Streaming (.tflite) | Dynamic | ...  | ...    | ...  | ...  |
 - - - 
 
 - **Dataset:** DNS3 Blind Test Set
@@ -47,7 +47,7 @@
 | GTCRN-Micro    | -      | 3.25  |  3.60   | 2.99  | 2.58  |
 | GTCRN-Micro Streaming    | - | ...  | ...    | ...  | ...  |
 | GTCRN-Micro Streaming  (ONNX)  | - | ...  | ...    | ...  | ...  |
-| GTCRN-Micro Streaming (.tflite) | int8  | ...  | ...    | ...  | ...  |
+| GTCRN-Micro Streaming (.tflite) | Dynamic  | ...  | ...    | ...  | ...  |
 
 ## Acknowledgements
 The original model this is based off of is [GTCRN](https://github.com/Xiaobin-Rong/gtcrn), as well as a notable amount of the setup to train and change the model was based off of the same authors project [SEtrain](https://github.com/Xiaobin-Rong/SEtrain/tree/plus).
