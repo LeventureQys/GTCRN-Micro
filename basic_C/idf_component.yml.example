@@ -1,0 +1,26 @@
+# ESP-IDF Component: GTCRN-Micro SDK
+# Use this file when building for ESP32 with ESP-IDF
+#
+# To use this component:
+# 1. Copy the gtcrn_micro directory to your ESP-IDF project's components folder
+# 2. Or add it as an extra component path in your project
+#
+# SPDX-License-Identifier: Apache-2.0
+
+idf_component_register(
+    SRCS
+        "src/gtcrn_engine.cpp"
+        "src/gtcrn_version.c"
+        "src/platform/platform_esp32.c"
+    INCLUDE_DIRS
+        "include"
+    REQUIRES
+        esp_timer
+        freertos
+        heap
+    PRIV_REQUIRES
+        esp_system
+)
+
+# Link against TFLite Micro (provided by espressif/esp-tflite-micro component)
+# Make sure to add esp-tflite-micro to your project's dependencies

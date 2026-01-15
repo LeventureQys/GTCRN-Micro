@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(tree:*)",
+      "Bash(del:*)",
+      "Bash(mkdir:*)",
+      "Bash(mv:*)",
+      "Bash(cmake:*)"
+    ]
+  }
+}
