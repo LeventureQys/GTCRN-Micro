@@ -1,4 +1,8 @@
 # Project Plan:
+- - - 
+# NOTE: 
+ - Project has been determined to not be deployable to MCU in current form and I have to step away. 
+ - I am leaving these here just for archival purposes.
 - - -
  * ###### Partially documenting steps for myself, but also for anyone else looking to see what the planning from start to finish looks like.
 - - - 
@@ -6,19 +10,12 @@
 
 #### ESP32
  - [x] Setup Repo and tooling
- - [x] Design an adjusted DNN model based off of *GTCRN* that is supported by TFLite Micro
+ - [ ] Design an adjusted DNN model based off of *GTCRN* that is supported by TFLite Micro
  - [x] Train new full toolchain-compatible model
  - [ ] Export and Quantize tuned DNN model
- - [ ] Deploy / Test on MCU (*ESP32-S3*)
- - [ ] Report performance and evaluation results
-
-#### STM32
- - [ ] Design an adjusted DNN model based off of *GTCRN* that is supported by Cube AI
- - [ ] Train new full toolchain-compatible model
- - [ ] Export and Quantize tuned DNN model
- - [ ] Deploy / Test on MCU (*STM32H7*)
- - [ ] Report performance and evaluation results
-- - - 
+ - [ ] Deploy / Test on MCUs 
+ - [x] Report performance and evaluation results
+     - Somewhat achieved - reported performances on TCN focused model in various formats.
 ### *Notes*
 
  - Each goal does not warrant the same time/effort allocation, nor with this be completely linear. 
